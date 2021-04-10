@@ -28,6 +28,9 @@ pub mod prelude;
 pub mod sdram;
 pub mod system;
 
+//#[cfg(feature = "field")]
+pub mod field;
+
 // Delay for ms, note if interrupts are active delay time will extend
 pub fn delay_ms(ms: u32) {
     delay_cycles(ms * MILICYCLES);

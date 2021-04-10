@@ -29,6 +29,7 @@ cortex-m-semihosting = { version = "0.3.7", optional = true  }
 [features]
 default = []
 
+field = []
 log-rtt = ["rtt-target", "panic-rtt-target"]
 log-itm = ["panic-itm", "lazy_static", "cortex-m-log"]
 log-semihosting = ["panic-semihosting", "lazy_static", "cortex-m-log", "cortex-m-semihosting"]
