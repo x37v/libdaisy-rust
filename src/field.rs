@@ -32,8 +32,6 @@ impl Field {
         sda: hal::gpio::gpiob::PB9<hal::gpio::Analog>,
         clocks: &hal::rcc::CoreClocks,
     ) -> Self {
-        //pwm_pca9685::Address::default(),
-        let addr: Address = Address::default();
         let mut led_i2c = Pca9685::new(
             i2cd.i2c(
                 (
@@ -44,7 +42,7 @@ impl Field {
                 i2crec,
                 clocks,
             ),
-            addr,
+            LED_ADDR0,
         )
         .unwrap();
         led_i2c.reset_internal_driver_state();
@@ -58,11 +56,19 @@ impl Field {
 
         let on = [0; 16];
         let off = [0; 16];
-        led_i2c.set_all_on_off(&on, &off).unwrap();
+        led_i2c.set_channel_on(Channel::All, 0).unwrap();
 
-        led_i2c.set_channel_full_on(Channel::C0, 4095).unwrap();
-        led_i2c.set_channel_full_on(Channel::C4, 4095).unwrap();
-        led_i2c.set_channel_full_on(Channel::C14, 128).unwrap();
+        //led_i2c.set_channel_full_on(Channel::C0, 4095).unwrap();
+        led_i2c.set_channel_full_on(Channel::C2, 4095).unwrap();
+        //led_i2c.set_channel_full_on(Channel::C14, 128).unwrap();
+
+        led_i2c.set_address(LED_ADDR1).unwrap();
+        led_i2c.set_channel_full_on(Channel::C1, 4095).unwrap();
+        led_i2c.set_channel_full_on(Channel::C3, 4095).unwrap();
+
+        led_i2c.set_address(LED_ADDR0).unwrap();
+        led_i2c.set_channel_full_on(Channel::C9, 4095).unwrap();
+        led_i2c.set_channel_full_on(Channel::C15, 4095).unwrap();
 
         Self { led_i2c }
     }
