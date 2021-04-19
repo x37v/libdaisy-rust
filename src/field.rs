@@ -42,55 +42,31 @@ impl Field {
             i2crec,
             clocks,
         );
-        crate::delay_ms(20);
-        led_i2c.write(LED_ADDR0, &[PCA9685_MODE1, 0]).unwrap();
-        crate::delay_ms(20);
-        led_i2c.write(LED_ADDR0, &[PCA9685_MODE1, 0]).unwrap();
-        crate::delay_ms(20);
-        led_i2c
-            .write(LED_ADDR0, &[PCA9685_MODE1, PCA9685_AUTO_INC])
-            .unwrap();
-        crate::delay_ms(20);
-        led_i2c
-            .write(LED_ADDR0, &[PCA9685_MODE2, 0b0011_0110])
-            .unwrap();
-        crate::delay_ms(20);
+
+        //configure, copied from libDaisy
+        //mode 1:
+        //  auto increment
+        //mode 2:
+        //  OE-high = high Impedance
+        //  Push-Pull outputs
+        //  outputs change on STOP
+        //  outputs inverted
+        for a in &[LED_ADDR0, LED_ADDR1] {
+            led_i2c
+                .write(*a, &[PCA9685_MODE1, PCA9685_AUTO_INC, 0b0011_0110])
+                .unwrap();
+            //turn all, full off
+            led_i2c.write(*a, &[0xFA, 0, 0, 0, 0x10]).unwrap();
+        }
 
         //LSB, MSB
-        led_i2c.write(LED_ADDR0, &[0x06, 0xFF, 0x1F, 0, 0]).unwrap();
-        crate::delay_ms(20);
-        led_i2c.write(LED_ADDR0, &[0x0A, 0xFF, 0x1F, 0, 0]).unwrap();
-
-        /*
         led_i2c
-            .set_output_change_behavior(pwm_pca9685::OutputStateChange::OnStop)
+            .write(LED_ADDR0, &[0x06, 0xFF, 0x1F, 0x0, 0x0])
             .unwrap();
+
         led_i2c
-            .set_output_logic_state(pwm_pca9685::OutputLogicState::Inverted)
+            .write(LED_ADDR1, &[0x1E, 0x00, 0x10, 0x0, 0x0])
             .unwrap();
-        led_i2c
-            .set_output_driver(pwm_pca9685::OutputDriver::TotemPole)
-            .unwrap();
-        led_i2c
-            .set_disabled_output_value(pwm_pca9685::DisabledOutputValue::HighImpedance)
-            .unwrap();
-        led_i2c.enable().unwrap();
-
-        led_i2c.set_channel_full_on(Channel::All, 4095).unwrap();
-
-        led_i2c.set_channel_full_on(Channel::C0, 4095).unwrap();
-        led_i2c.set_channel_full_on(Channel::C2, 4095).unwrap();
-        led_i2c.set_channel_full_on(Channel::C14, 128).unwrap();
-
-        led_i2c.set_address(LED_ADDR1).unwrap();
-        led_i2c.set_channel_full_off(Channel::All).unwrap();
-        led_i2c.set_channel_full_on(Channel::C1, 4095).unwrap();
-        led_i2c.set_channel_full_on(Channel::C3, 4095).unwrap();
-
-        led_i2c.set_address(LED_ADDR0).unwrap();
-        led_i2c.set_channel_full_on(Channel::C9, 4095).unwrap();
-        led_i2c.set_channel_full_on(Channel::C15, 4095).unwrap();
-        */
 
         Self {}
     }
