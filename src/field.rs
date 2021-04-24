@@ -33,8 +33,13 @@ const GAMMA: [u16; 256] = [
     3788, 3831, 3874, 3918, 3962, 4006, 4050, 4095,
 ];
 
+pub struct FieldLeds {
+    i2c: hal::i2c::I2c<hal::stm32::I2C1>,
+    drivers: [LedDriver; 2],
+}
+
 pub struct Field {
-    //led_i2c: Pca9685<I2c<I2C1>>,
+    leds: Option<FieldLeds>,
 }
 
 #[derive(Clone, Copy)]
@@ -44,17 +49,18 @@ struct Led {
     off: u16,
 }
 
+//struct representing an entire, auto incremented, update
+#[repr(C, packed)]
+struct LedTxBuffer {
+    reg: u8,
+    leds: [Led; 16],
+}
+
 impl Default for Led {
     fn default() -> Self {
         //full off
         Self { on: 0, off: 0x1001 }
     }
-}
-
-#[repr(C, packed)]
-struct LedTxBuffer {
-    reg: u8,
-    leds: [Led; 16],
 }
 
 impl Default for LedTxBuffer {
@@ -67,6 +73,7 @@ impl Default for LedTxBuffer {
     }
 }
 
+///PCA9685 Led Driver
 pub struct LedDriver {
     addr: u8,
     buffer: LedTxBuffer,
@@ -74,6 +81,7 @@ pub struct LedDriver {
 
 //TODO DMA
 impl LedDriver {
+    ///Initialize the Led driver with the given address.
     pub fn new(i2c: &mut I2CWrite, addr: u8) -> Self {
         //configure, copied from libDaisy
         //mode 1:
@@ -94,6 +102,7 @@ impl LedDriver {
         }
     }
 
+    /// Set all the buffered values for all LEDs to the given brightness.
     pub fn set_all(&mut self, brightness: u8) {
         let cycles = GAMMA[brightness as usize];
 
@@ -113,6 +122,7 @@ impl LedDriver {
         }
     }
 
+    /// Set the buffered value for the given LED to the given brightness.
     pub fn set(&mut self, index: usize, brightness: u8) {
         assert!(index < 16);
         let cycles = GAMMA[brightness as usize];
@@ -130,6 +140,7 @@ impl LedDriver {
         }
     }
 
+    /// Update all the leds.
     pub fn draw(&self, i2c: &mut I2CWrite) {
         i2c.write(self.addr, unsafe {
             core::slice::from_raw_parts(
@@ -138,6 +149,61 @@ impl LedDriver {
             )
         })
         .unwrap();
+    }
+}
+impl FieldLeds {
+    pub fn new(
+        i2cd: hal::stm32::I2C1,
+        i2crec: hal::rcc::rec::I2c1,
+        scl: hal::gpio::gpiob::PB8<hal::gpio::Analog>,
+        sda: hal::gpio::gpiob::PB9<hal::gpio::Analog>,
+        clocks: &hal::rcc::CoreClocks,
+    ) -> Self {
+        let mut i2c = i2cd.i2c(
+            (
+                scl.into_alternate_af4().set_open_drain(),
+                sda.into_alternate_af4().set_open_drain(),
+            ),
+            1.mhz(),
+            i2crec,
+            clocks,
+        );
+
+        let drivers = [
+            LedDriver::new(&mut i2c, LED_ADDR0),
+            LedDriver::new(&mut i2c, LED_ADDR1),
+        ];
+        Self { i2c, drivers }
+    }
+
+    pub fn button_set(&mut self, index: usize, brightness: u8) {
+        assert!(index < 16);
+        let driver = &mut self.drivers[0];
+        if index < 8 {
+            driver.set(index, brightness);
+        } else {
+            //the lower row counts backwards
+            driver.set(15 - (index - 8), brightness);
+        }
+    }
+
+    pub fn button_set_all(&mut self, brightness: u8) {
+        self.drivers[0].set_all(brightness);
+    }
+
+    pub fn pot_set(&mut self, index: usize, brightness: u8) {
+        assert!(index < 8);
+        self.drivers[1].set(index, brightness);
+    }
+
+    pub fn pot_set_all(&mut self, brightness: u8) {
+        self.drivers[1].set_all(brightness);
+    }
+
+    pub fn draw(&mut self) {
+        for driver in self.drivers.iter() {
+            driver.draw(&mut self.i2c)
+        }
     }
 }
 
@@ -149,55 +215,21 @@ impl Field {
         sda: hal::gpio::gpiob::PB9<hal::gpio::Analog>,
         clocks: &hal::rcc::CoreClocks,
     ) -> Self {
-        let mut led_i2c = i2cd.i2c(
-            (
-                scl.into_alternate_af4().set_open_drain(),
-                sda.into_alternate_af4().set_open_drain(),
-            ),
-            1.mhz(),
-            i2crec,
-            clocks,
-        );
-
-        let mut drivers = [
-            LedDriver::new(&mut led_i2c, LED_ADDR0),
-            LedDriver::new(&mut led_i2c, LED_ADDR1),
-        ];
-
-        drivers[0].set(2, 0xFF);
-        drivers[0].set(14, 0x7F);
-        drivers[1].set_all(0xAF);
-
-        drivers[0].draw(&mut led_i2c);
-        drivers[1].draw(&mut led_i2c);
-
-        /*
-        //configure, copied from libDaisy
-        //mode 1:
-        //  auto increment
-        //mode 2:
-        //  OE-high = high Impedance
-        //  Push-Pull outputs
-        //  outputs change on STOP
-        //  outputs inverted
-        for a in &[LED_ADDR0, LED_ADDR1] {
-            led_i2c
-                .write(*a, &[PCA9685_MODE1, PCA9685_AUTO_INC, 0b0011_0110])
-                .unwrap();
-            //turn all, full off
-            led_i2c.write(*a, &[0xFA, 0, 0, 0, 0x10]).unwrap();
+        Self {
+            leds: Some(FieldLeds::new(i2cd, i2crec, scl, sda, clocks)),
         }
+    }
 
-        //LSB, MSB
-        led_i2c
-            .write(LED_ADDR0, &[0x06, 0xFF, 0x1F, 0x0, 0x0])
-            .unwrap();
+    /// Get a mutable reference to the LEDs
+    pub fn leds(&mut self) -> Option<&mut FieldLeds> {
+        self.leds.as_mut()
+    }
 
-        led_i2c
-            .write(LED_ADDR1, &[0x1E, 0x00, 0x10, 0x0, 0x0])
-            .unwrap();
-        */
-
-        Self {}
+    /// Get the LED struct.
+    ///
+    /// # Panics
+    /// Will panic if done more than once.
+    pub fn split_leds(&mut self) -> FieldLeds {
+        self.leds.take().unwrap()
     }
 }
