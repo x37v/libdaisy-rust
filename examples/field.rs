@@ -85,6 +85,13 @@ const APP: () = {
             &mut ccdr.clocks,
         );
 
+        let mut leds = field.split_leds();
+        leds.button_set(8, 0xFF);
+        leds.button_set(10, 0xFF);
+        leds.pot_set(7, 0xFF);
+        leds.pot_set_all(0);
+        leds.draw();
+
         init::LateResources {
             seed_led: gpio.led,
             timer2,
