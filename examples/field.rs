@@ -3,7 +3,12 @@
 #![no_std]
 use log::info;
 
-use libdaisy::{field::Field, gpio, logger, prelude::*, system::System};
+use libdaisy::{
+    field::{Field, FieldLeds},
+    gpio, logger,
+    prelude::*,
+    system::System,
+};
 use stm32h7xx_hal::{
     block, stm32,
     timer::{Event, Timer},
@@ -17,7 +22,7 @@ use stm32h7xx_hal::{
 const APP: () = {
     struct Resources {
         seed_led: gpio::SeedLed,
-        field: Field,
+        field_leds: FieldLeds,
         timer2: Timer<stm32::TIM2>,
     }
 
@@ -34,7 +39,7 @@ const APP: () = {
 
         info!("Startup done!");
 
-        timer2.set_freq(500.ms());
+        timer2.set_freq(50.ms());
 
         let gpioa = device.GPIOA.split(ccdr.peripheral.GPIOA);
         let gpiob = device.GPIOB.split(ccdr.peripheral.GPIOB);
@@ -86,30 +91,36 @@ const APP: () = {
         );
 
         let mut leds = field.split_leds();
-        leds.button_set(8, 0xFF);
-        leds.button_set(10, 0xFF);
-        leds.pot_set(7, 0xFF);
-        leds.pot_set_all(0);
-        leds.draw();
 
         init::LateResources {
             seed_led: gpio.led,
             timer2,
-            field,
+            field_leds: leds,
         }
     }
 
-    #[task( binds = TIM2, resources = [timer2, seed_led] )]
+    #[task( binds = TIM2, resources = [timer2, seed_led, field_leds] )]
     fn blink(ctx: blink::Context) {
         static mut LED_IS_ON: bool = true;
+        static mut INDEX: usize = 0;
+        static mut BRIGHTNESS: u8 = 0;
 
         ctx.resources.timer2.clear_irq();
 
+        let index = *INDEX;
+
+        ctx.resources.field_leds.pot_set_all(*BRIGHTNESS);
         if *LED_IS_ON {
+            ctx.resources.field_leds.button_set(index, 0xFF);
             ctx.resources.seed_led.set_high().unwrap();
         } else {
+            ctx.resources.field_leds.button_set(index, 0);
             ctx.resources.seed_led.set_low().unwrap();
+            *INDEX = (index + 1) % 16;
         }
         *LED_IS_ON = !(*LED_IS_ON);
+        ctx.resources.field_leds.draw();
+
+        *BRIGHTNESS = (*BRIGHTNESS).wrapping_add(16);
     }
 };
