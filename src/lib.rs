@@ -28,7 +28,6 @@ pub mod prelude;
 pub mod sdram;
 pub mod system;
 
-//#[cfg(feature = "field")]
 pub mod field;
 
 // Delay for ms, note if interrupts are active delay time will extend

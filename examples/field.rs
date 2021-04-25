@@ -4,7 +4,7 @@
 use log::info;
 
 use libdaisy::{
-    field::{Field, FieldLeds},
+    field::{Field, FieldKeyboard, FieldLeds},
     gpio, logger,
     prelude::*,
     system::System,
@@ -23,6 +23,7 @@ const APP: () = {
     struct Resources {
         seed_led: gpio::SeedLed,
         field_leds: FieldLeds,
+        keyboard: FieldKeyboard,
         timer2: Timer<stm32::TIM2>,
     }
 
@@ -92,31 +93,43 @@ const APP: () = {
 
         let mut leds = field.split_leds();
 
+        let keyboard = FieldKeyboard::new(
+            gpio.daisy26.take().unwrap(),
+            gpio.daisy27.take().unwrap(),
+            gpio.daisy28.take().unwrap(),
+        );
+
         init::LateResources {
             seed_led: gpio.led,
             timer2,
+            keyboard,
             field_leds: leds,
         }
     }
 
-    #[task( binds = TIM2, resources = [timer2, seed_led, field_leds] )]
+    #[task( binds = TIM2, resources = [timer2, seed_led, field_leds, keyboard] )]
     fn blink(ctx: blink::Context) {
         static mut LED_IS_ON: bool = true;
-        static mut INDEX: usize = 0;
         static mut BRIGHTNESS: u8 = 0;
 
         ctx.resources.timer2.clear_irq();
 
-        let index = *INDEX;
+        let r = ctx.resources.keyboard.read();
+
+        for by in 0..2 {
+            let byte = r[by];
+            for b in 0..8 {
+                ctx.resources
+                    .field_leds
+                    .button_set(by * 8 + b, if byte & (1 << b) != 0 { 0xFF } else { 0 });
+            }
+        }
 
         ctx.resources.field_leds.pot_set_all(*BRIGHTNESS);
         if *LED_IS_ON {
-            ctx.resources.field_leds.button_set(index, 0xFF);
             ctx.resources.seed_led.set_high().unwrap();
         } else {
-            ctx.resources.field_leds.button_set(index, 0);
             ctx.resources.seed_led.set_low().unwrap();
-            *INDEX = (index + 1) % 16;
         }
         *LED_IS_ON = !(*LED_IS_ON);
         ctx.resources.field_leds.draw();

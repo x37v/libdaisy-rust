@@ -1,4 +1,5 @@
 use hal::prelude::*;
+use shift::{Delay as ShiftDelay, ShiftClockDelay, ShiftIn};
 use stm32h7xx_hal as hal;
 
 type I2CWrite = dyn hal::hal::blocking::i2c::Write<Error = hal::i2c::Error>;
@@ -231,5 +232,64 @@ impl Field {
     /// Will panic if done more than once.
     pub fn split_leds(&mut self) -> FieldLeds {
         self.leds.take().unwrap()
+    }
+}
+
+struct FieldShiftDelay;
+pub struct FieldKeyboard {
+    sreg: ShiftKeyboard,
+}
+
+type ShiftKeyboard = ShiftIn<
+    hal::gpio::gpiog::PG9<hal::gpio::Output<hal::gpio::PushPull>>,
+    hal::gpio::gpioa::PA2<hal::gpio::Output<hal::gpio::PushPull>>,
+    hal::gpio::gpiod::PD11<hal::gpio::Input<hal::gpio::Floating>>,
+    FieldShiftDelay,
+    2,
+>;
+
+impl FieldKeyboard {
+    pub fn new(
+        data: hal::gpio::gpiod::PD11<hal::gpio::Analog>,
+        latch: hal::gpio::gpiog::PG9<hal::gpio::Analog>,
+        clock: hal::gpio::gpioa::PA2<hal::gpio::Analog>,
+    ) -> Self {
+        let latch = latch.into_push_pull_output();
+        let clock = clock.into_push_pull_output();
+        let data = data.into_floating_input();
+        let sreg = ShiftIn::new(latch, clock, data, FieldShiftDelay);
+
+        Self { sreg }
+    }
+
+    /// Read in all the data
+    pub fn read(&mut self) -> [u8; 2] {
+        //shift data read in backwards, re-order & invert
+        let mut o: [u8; 2] = [0; 2];
+        let r = self.sreg.read();
+        for i in 0..2 {
+            let byte = !r[if i == 0 { 1 } else { 0 }];
+            o[i] = 0
+                | (byte & (1 << 0)) << 7
+                | (byte & (1 << 1)) << 5
+                | (byte & (1 << 2)) << 3
+                | (byte & (1 << 3)) << 1
+                | (byte & (1 << 4)) >> 1
+                | (byte & (1 << 5)) >> 3
+                | (byte & (1 << 6)) >> 5
+                | (byte & (1 << 7)) >> 7;
+        }
+        o
+    }
+}
+
+impl ShiftClockDelay for FieldShiftDelay {
+    fn delay(&self, delay: ShiftDelay) {
+        //XXX figure out actual times
+        match delay {
+            ShiftDelay::ClockLow => crate::delay_ms(1),
+            ShiftDelay::ClockHigh => crate::delay_ms(1),
+            ShiftDelay::LatchHigh => crate::delay_ms(1),
+        }
     }
 }
