@@ -34,19 +34,38 @@ pub mod system;
 
 pub mod field;
 
-/// Delay for ms, note if interrupts are active delay time will extend
-pub fn delay_ms(ms: u32) {
-    delay_cycles(ms * MILICYCLES);
+/// Delay by milliseconds.
+///
+/// # Arguments
+/// * `t` - the number of milliseconds to delay.
+///
+/// # Remarks
+/// If interrupts are active delay time will extend.
+pub fn delay_ms(t: u32) {
+    delay_cycles(t * MILICYCLES);
 }
 
-/// Delay for micro sec, note if interrupts are active delay time will extend
-pub fn delay_us(us: u32) {
-    delay_cycles(us * MICROCYCLES);
+/// Delay by microseconds.
+///
+/// # Arguments
+/// * `t` - the number of microseconds to delay.
+///
+/// # Remarks
+/// If interrupts are active delay time will extend.
+pub fn delay_us(t: u32) {
+    delay_cycles(t * MICROCYCLES);
 }
 
-/// Delay for nano sec, note if interrupts are active delay time will extend
-pub fn delay_ns(ns: u32) {
-    let cycles = CLOCK_RATE_HZ.0.saturating_mul(ns) / MICRO;
+/// Delay by nanoseconds.
+///
+/// # Arguments
+/// * `t` - the number of nanoseconds to delay.
+///
+/// # Remarks
+/// If interrupts are active delay time will extend.
+#[inline]
+pub fn delay_ns(t: u32) {
+    let cycles = CLOCK_RATE_HZ.0.saturating_mul(t) / MICRO;
     delay_cycles(if cycles == 0 { 1 } else { cycles });
 }
 
