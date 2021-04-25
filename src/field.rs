@@ -284,12 +284,9 @@ impl FieldKeyboard {
 }
 
 impl ShiftClockDelay for FieldShiftDelay {
-    fn delay(&self, delay: ShiftDelay) {
-        //XXX figure out actual times
-        match delay {
-            ShiftDelay::ClockLow => crate::delay_ms(1),
-            ShiftDelay::ClockHigh => crate::delay_ms(1),
-            ShiftDelay::LatchHigh => crate::delay_ms(1),
-        }
+    //clock freq max is 3MHz at 5v.. same at 3.3??
+    //166ns * 2 -> 332ns -> ~3MHz
+    fn delay(&self, _delay: ShiftDelay) {
+        crate::delay_ns(166);
     }
 }
