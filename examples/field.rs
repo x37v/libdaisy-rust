@@ -10,6 +10,7 @@ use libdaisy::{
     system::System,
 };
 use stm32h7xx_hal::{
+    delay::Delay,
     hal::digital::v2::InputPin,
     stm32,
     timer::{Event, Timer},
@@ -86,6 +87,8 @@ const APP: () = {
             Some(gpiob.pb15),
         );
 
+        let mut delay = Delay::new(ctx.core.SYST, ccdr.clocks);
+
         let mut field = Field::new(
             //leds
             device.I2C1,
@@ -102,7 +105,15 @@ const APP: () = {
             //gates
             gpio.daisy0.take().unwrap(),
             gpio.daisy15.take().unwrap(),
+            //oled display
+            device.SPI1,
+            ccdr.peripheral.SPI1,
+            gpio.daisy7.take().unwrap(),
+            gpio.daisy8.take().unwrap(),
+            gpio.daisy9.take().unwrap(),
+            gpio.daisy10.take().unwrap(),
             //clocks
+            &mut delay,
             &mut ccdr.clocks,
         );
 

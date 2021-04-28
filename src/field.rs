@@ -1,3 +1,4 @@
+use embedded_graphics::{fonts::Font6x8, prelude::*};
 use hal::prelude::*;
 use shift::{Delay as ShiftDelay, ShiftClockDelay, ShiftIn};
 use stm32h7xx_hal as hal;
@@ -223,6 +224,7 @@ impl FieldLeds {
 
 impl Field {
     pub fn new(
+        //leds
         i2c_dev: hal::stm32::I2C1,
         i2c_rec: hal::rcc::rec::I2c1,
         i2c_scl: hal::gpio::gpiob::PB8<hal::gpio::Analog>,
@@ -241,9 +243,45 @@ impl Field {
         gate_in: hal::gpio::gpiob::PB12<hal::gpio::Analog>,
         gate_out: hal::gpio::gpioc::PC0<hal::gpio::Analog>,
 
+        //oled display
+        oled_spi_dev: hal::stm32::SPI1,
+        oled_spi_rec: hal::rcc::rec::Spi1,
+        oled_nss: hal::gpio::gpiog::PG10<hal::gpio::Analog>,
+        oled_sck: hal::gpio::gpiog::PG11<hal::gpio::Analog>,
+        oled_cmd: hal::gpio::gpiob::PB4<hal::gpio::Alternate<hal::gpio::AF0>>,
+        oled_mosi: hal::gpio::gpiob::PB5<hal::gpio::Analog>,
+
         //clocks
+        delay: &mut hal::delay::Delay,
         clocks: &hal::rcc::CoreClocks,
     ) -> Self {
+        let oled_spi: hal::spi::Spi<_, _, u8> = oled_spi_dev.spi(
+            (
+                oled_sck.into_alternate_af5(),
+                hal::spi::NoMiso,
+                oled_mosi.into_alternate_af5(),
+            ),
+            hal::spi::MODE_0,
+            3.mhz(),
+            oled_spi_rec,
+            &clocks,
+        );
+        let mut disp: ssd1309::mode::GraphicsMode<_> = ssd1309::Builder::new()
+            .connect(display_interface_spi::SPIInterface::new(
+                oled_spi,
+                oled_cmd.into_push_pull_output(),
+                oled_nss.into_push_pull_output(),
+            ))
+            .into();
+
+        let mut reset: ssd1309::builder::NoOutputPin<()> = ssd1309::builder::NoOutputPin::new();
+        disp.reset(&mut reset, delay).unwrap();
+        disp.init().unwrap();
+        disp.flush().unwrap();
+        disp.set_pixel(10, 20, 1);
+        disp.set_pixel(10, 21, 1);
+        disp.flush().unwrap();
+
         Self {
             leds: Some(FieldLeds::new(i2c_dev, i2c_rec, i2c_scl, i2c_sda, clocks)),
             keyboard: Some(FieldKeyboard::new(
