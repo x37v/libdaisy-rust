@@ -4,12 +4,13 @@
 use log::info;
 
 use libdaisy::{
-    field::{Field, FieldKeyboard, FieldLeds},
+    field::{Field, FieldKeyboard, FieldLeds, FieldSwitches},
     gpio, logger,
     prelude::*,
     system::System,
 };
 use stm32h7xx_hal::{
+    hal::digital::v2::InputPin,
     stm32,
     timer::{Event, Timer},
 };
@@ -24,6 +25,7 @@ const APP: () = {
         seed_led: gpio::SeedLed,
         field_leds: FieldLeds,
         keyboard: FieldKeyboard,
+        switches: FieldSwitches,
         timer2: Timer<stm32::TIM2>,
     }
 
@@ -91,8 +93,8 @@ const APP: () = {
             gpio.daisy11.take().unwrap(),
             gpio.daisy12.take().unwrap(),
             //switches
-            gpio.daisy29.take().unwrap(),
             gpio.daisy30.take().unwrap(),
+            gpio.daisy29.take().unwrap(),
             //keyboard
             gpio.daisy26.take().unwrap(),
             gpio.daisy27.take().unwrap(),
@@ -106,16 +108,18 @@ const APP: () = {
 
         let leds = field.split_leds();
         let keyboard = field.split_keyboard();
+        let switches = field.split_switches();
 
         init::LateResources {
             seed_led: gpio.led,
             timer2,
             keyboard,
+            switches,
             field_leds: leds,
         }
     }
 
-    #[task( binds = TIM2, resources = [timer2, seed_led, field_leds, keyboard] )]
+    #[task( binds = TIM2, resources = [timer2, seed_led, field_leds, keyboard, switches] )]
     fn blink(ctx: blink::Context) {
         static mut LED_IS_ON: bool = true;
         static mut BRIGHTNESS: u8 = 0;
@@ -142,6 +146,17 @@ const APP: () = {
         *LED_IS_ON = !(*LED_IS_ON);
         ctx.resources.field_leds.draw();
 
-        *BRIGHTNESS = (*BRIGHTNESS).wrapping_add(16);
+        match ctx.resources.switches.0.is_low() {
+            Ok(true) => {
+                *BRIGHTNESS = (*BRIGHTNESS).wrapping_add(16);
+            }
+            _ => (),
+        };
+        match ctx.resources.switches.1.is_low() {
+            Ok(true) => {
+                *BRIGHTNESS = (*BRIGHTNESS).wrapping_add(64);
+            }
+            _ => (),
+        };
     }
 };

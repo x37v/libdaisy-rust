@@ -35,8 +35,8 @@ const GAMMA: [u16; 256] = [
 ];
 
 pub type FieldSwitches = (
-    hal::gpio::gpiob::PB14<hal::gpio::Input<hal::gpio::PullUp>>,
     hal::gpio::gpiob::PB15<hal::gpio::Input<hal::gpio::PullUp>>,
+    hal::gpio::gpiob::PB14<hal::gpio::Input<hal::gpio::PullUp>>,
 );
 
 pub type FieldGates = (
@@ -229,8 +229,8 @@ impl Field {
         i2c_sda: hal::gpio::gpiob::PB9<hal::gpio::Analog>,
 
         //switches
-        sw1: hal::gpio::gpiob::PB14<hal::gpio::Analog>,
-        sw2: hal::gpio::gpiob::PB15<hal::gpio::Analog>,
+        sw1: hal::gpio::gpiob::PB15<hal::gpio::Analog>,
+        sw2: hal::gpio::gpiob::PB14<hal::gpio::Analog>,
 
         //keyboard
         keyboard_data: hal::gpio::gpiod::PD11<hal::gpio::Analog>,
