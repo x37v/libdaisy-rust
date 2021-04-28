@@ -10,7 +10,7 @@ use libdaisy::{
     system::System,
 };
 use stm32h7xx_hal::{
-    block, stm32,
+    stm32,
     timer::{Event, Timer},
 };
 
@@ -84,20 +84,24 @@ const APP: () = {
             Some(gpiob.pb15),
         );
         let mut field = Field::new(
+            //leds
             device.I2C1,
             ccdr.peripheral.I2C1,
             gpio.daisy11.take().unwrap(),
             gpio.daisy12.take().unwrap(),
-            &mut ccdr.clocks,
-        );
-
-        let mut leds = field.split_leds();
-
-        let keyboard = FieldKeyboard::new(
+            //switches
+            gpio.daisy29.take().unwrap(),
+            gpio.daisy30.take().unwrap(),
+            //keyboard
             gpio.daisy26.take().unwrap(),
             gpio.daisy27.take().unwrap(),
             gpio.daisy28.take().unwrap(),
+            //clocks
+            &mut ccdr.clocks,
         );
+
+        let leds = field.split_leds();
+        let keyboard = field.split_keyboard();
 
         init::LateResources {
             seed_led: gpio.led,

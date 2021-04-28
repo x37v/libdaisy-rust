@@ -34,6 +34,11 @@ const GAMMA: [u16; 256] = [
     3788, 3831, 3874, 3918, 3962, 4006, 4050, 4095,
 ];
 
+pub type FieldSwitches = (
+    hal::gpio::gpiob::PB14<hal::gpio::Input<hal::gpio::PullUp>>,
+    hal::gpio::gpiob::PB15<hal::gpio::Input<hal::gpio::PullUp>>,
+);
+
 pub struct FieldLeds {
     i2c: hal::i2c::I2c<hal::stm32::I2C1>,
     drivers: [LedDriver; 2],
@@ -41,6 +46,8 @@ pub struct FieldLeds {
 
 pub struct Field {
     leds: Option<FieldLeds>,
+    keyboard: Option<FieldKeyboard>,
+    switches: Option<FieldSwitches>,
 }
 
 #[derive(Clone, Copy)]
@@ -210,14 +217,31 @@ impl FieldLeds {
 
 impl Field {
     pub fn new(
-        i2cd: hal::stm32::I2C1,
-        i2crec: hal::rcc::rec::I2c1,
-        scl: hal::gpio::gpiob::PB8<hal::gpio::Analog>,
-        sda: hal::gpio::gpiob::PB9<hal::gpio::Analog>,
+        i2c_dev: hal::stm32::I2C1,
+        i2c_rec: hal::rcc::rec::I2c1,
+        i2c_scl: hal::gpio::gpiob::PB8<hal::gpio::Analog>,
+        i2c_sda: hal::gpio::gpiob::PB9<hal::gpio::Analog>,
+
+        //switches
+        sw1: hal::gpio::gpiob::PB14<hal::gpio::Analog>,
+        sw2: hal::gpio::gpiob::PB15<hal::gpio::Analog>,
+
+        //keyboard
+        keyboard_data: hal::gpio::gpiod::PD11<hal::gpio::Analog>,
+        keyboard_latch: hal::gpio::gpiog::PG9<hal::gpio::Analog>,
+        keyboard_clock: hal::gpio::gpioa::PA2<hal::gpio::Analog>,
+
+        //clocks
         clocks: &hal::rcc::CoreClocks,
     ) -> Self {
         Self {
-            leds: Some(FieldLeds::new(i2cd, i2crec, scl, sda, clocks)),
+            leds: Some(FieldLeds::new(i2c_dev, i2c_rec, i2c_scl, i2c_sda, clocks)),
+            keyboard: Some(FieldKeyboard::new(
+                keyboard_data,
+                keyboard_latch,
+                keyboard_clock,
+            )),
+            switches: Some((sw1.into_pull_up_input(), sw2.into_pull_up_input())),
         }
     }
 
@@ -232,6 +256,22 @@ impl Field {
     /// Will panic if done more than once.
     pub fn split_leds(&mut self) -> FieldLeds {
         self.leds.take().unwrap()
+    }
+
+    /// Get the keyboard.
+    ///
+    /// # Panics
+    /// Will panic if done more than once.
+    pub fn split_keyboard(&mut self) -> FieldKeyboard {
+        self.keyboard.take().unwrap()
+    }
+
+    /// Get the switches tuple.
+    ///
+    /// # Panics
+    /// Will panic if done more than once.
+    pub fn split_switches(&mut self) -> FieldSwitches {
+        self.switches.take().unwrap()
     }
 }
 
