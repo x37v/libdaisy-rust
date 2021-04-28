@@ -83,6 +83,7 @@ const APP: () = {
             Some(gpiob.pb14),
             Some(gpiob.pb15),
         );
+
         let mut field = Field::new(
             //leds
             device.I2C1,
@@ -96,6 +97,9 @@ const APP: () = {
             gpio.daisy26.take().unwrap(),
             gpio.daisy27.take().unwrap(),
             gpio.daisy28.take().unwrap(),
+            //gates
+            gpio.daisy0.take().unwrap(),
+            gpio.daisy15.take().unwrap(),
             //clocks
             &mut ccdr.clocks,
         );

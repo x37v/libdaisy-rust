@@ -39,6 +39,11 @@ pub type FieldSwitches = (
     hal::gpio::gpiob::PB15<hal::gpio::Input<hal::gpio::PullUp>>,
 );
 
+pub type FieldGates = (
+    hal::gpio::gpiob::PB12<hal::gpio::Input<hal::gpio::Floating>>,
+    hal::gpio::gpioc::PC0<hal::gpio::Output<hal::gpio::PushPull>>,
+);
+
 pub struct FieldLeds {
     i2c: hal::i2c::I2c<hal::stm32::I2C1>,
     drivers: [LedDriver; 2],
@@ -48,6 +53,7 @@ pub struct Field {
     leds: Option<FieldLeds>,
     keyboard: Option<FieldKeyboard>,
     switches: Option<FieldSwitches>,
+    gates: Option<FieldGates>,
 }
 
 #[derive(Clone, Copy)]
@@ -231,6 +237,10 @@ impl Field {
         keyboard_latch: hal::gpio::gpiog::PG9<hal::gpio::Analog>,
         keyboard_clock: hal::gpio::gpioa::PA2<hal::gpio::Analog>,
 
+        //gates
+        gate_in: hal::gpio::gpiob::PB12<hal::gpio::Analog>,
+        gate_out: hal::gpio::gpioc::PC0<hal::gpio::Analog>,
+
         //clocks
         clocks: &hal::rcc::CoreClocks,
     ) -> Self {
@@ -242,6 +252,10 @@ impl Field {
                 keyboard_clock,
             )),
             switches: Some((sw1.into_pull_up_input(), sw2.into_pull_up_input())),
+            gates: Some((
+                gate_in.into_floating_input(),
+                gate_out.into_push_pull_output(),
+            )),
         }
     }
 
@@ -272,6 +286,14 @@ impl Field {
     /// Will panic if done more than once.
     pub fn split_switches(&mut self) -> FieldSwitches {
         self.switches.take().unwrap()
+    }
+
+    /// Get the gates tuple.
+    ///
+    /// # Panics
+    /// Will panic if done more than once.
+    pub fn split_gates(&mut self) -> FieldGates {
+        self.gates.take().unwrap()
     }
 }
 
