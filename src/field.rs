@@ -17,6 +17,9 @@ const PCA9685_AUTO_INC: u8 = 0b0010_0000;
 
 const PCA9685_INV: u8 = 0b0001_0000;
 
+/// Display Size width, height
+pub const FIELD_DISPLAY_SIZE: (usize, usize) = (128, 64);
+
 const GAMMA: [u16; 256] = [
     0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 8, 8, 9, 10,
     11, 12, 13, 15, 16, 17, 18, 20, 21, 23, 25, 26, 28, 30, 32, 34, 36, 38, 40, 43, 45, 48, 50, 53,
