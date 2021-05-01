@@ -3,6 +3,12 @@
 #![no_std]
 use log::info;
 
+use embedded_graphics::{
+    fonts::{Font6x8, Text},
+    pixelcolor::BinaryColor,
+    prelude::*,
+    style::{TextStyle, TextStyleBuilder},
+};
 use libdaisy::{
     field::{Field, FieldKeyboard, FieldLeds, FieldSwitches},
     gpio, logger,
@@ -120,6 +126,21 @@ const APP: () = {
         let leds = field.split_leds();
         let keyboard = field.split_keyboard();
         let switches = field.split_switches();
+
+        let mut disp = field.split_display();
+
+        let style: TextStyle<_, Font6x8> = TextStyleBuilder::new(Font6x8)
+            .text_color(BinaryColor::On)
+            .background_color(BinaryColor::Off)
+            .build();
+
+        let text = Text::new("Hello Daisy!", Point::new(0, 0)).into_styled(style);
+        text.draw(&mut disp).unwrap();
+
+        let text = Text::new(" - Rust", Point::new(0, 10)).into_styled(style);
+        text.draw(&mut disp).unwrap();
+
+        disp.flush().unwrap();
 
         init::LateResources {
             seed_led: gpio.led,

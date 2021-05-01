@@ -1,10 +1,3 @@
-use embedded_graphics::{
-    fonts::{Font6x8, Text},
-    pixelcolor::BinaryColor,
-    prelude::*,
-    style::{TextStyle, TextStyleBuilder},
-};
-
 use hal::prelude::*;
 use shift::{Delay as ShiftDelay, ShiftClockDelay, ShiftIn};
 use stm32h7xx_hal as hal;
@@ -51,6 +44,14 @@ pub type FieldGates = (
     hal::gpio::gpioc::PC0<hal::gpio::Output<hal::gpio::PushPull>>,
 );
 
+pub type FieldDisplay = ssd1309::prelude::GraphicsMode<
+    display_interface_spi::SPIInterface<
+        hal::spi::Spi<hal::device::SPI1, hal::spi::Enabled>,
+        hal::gpio::gpiob::PB4<hal::gpio::Output<hal::gpio::PushPull>>,
+        hal::gpio::gpiog::PG10<hal::gpio::Output<hal::gpio::PushPull>>,
+    >,
+>;
+
 pub struct FieldLeds {
     i2c: hal::i2c::I2c<hal::stm32::I2C1>,
     drivers: [LedDriver; 2],
@@ -61,6 +62,7 @@ pub struct Field {
     keyboard: Option<FieldKeyboard>,
     switches: Option<FieldSwitches>,
     gates: Option<FieldGates>,
+    display: Option<FieldDisplay>,
 }
 
 #[derive(Clone, Copy)]
@@ -272,7 +274,7 @@ impl Field {
             oled_spi_rec,
             &clocks,
         );
-        let mut disp: ssd1309::mode::GraphicsMode<_> = ssd1309::Builder::new()
+        let mut display: FieldDisplay = ssd1309::Builder::new()
             .connect(display_interface_spi::SPIInterface::new(
                 oled_spi,
                 oled_cmd.into_push_pull_output(),
@@ -281,22 +283,9 @@ impl Field {
             .into();
 
         let mut reset: ssd1309::builder::NoOutputPin<()> = ssd1309::builder::NoOutputPin::new();
-        disp.reset(&mut reset, delay).unwrap();
-        disp.init().unwrap();
-        disp.flush().unwrap();
-
-        let style: TextStyle<_, Font6x8> = TextStyleBuilder::new(Font6x8)
-            .text_color(BinaryColor::On)
-            .background_color(BinaryColor::Off)
-            .build();
-
-        let text = Text::new("Hello Daisy!", Point::new(0, 0)).into_styled(style);
-        text.draw(&mut disp).unwrap();
-
-        let text = Text::new(" - Rust", Point::new(0, 10)).into_styled(style);
-        text.draw(&mut disp).unwrap();
-
-        disp.flush().unwrap();
+        display.reset(&mut reset, delay).unwrap();
+        display.init().unwrap();
+        display.flush().unwrap();
 
         Self {
             leds: Some(FieldLeds::new(i2c_dev, i2c_rec, i2c_scl, i2c_sda, clocks)),
@@ -310,6 +299,7 @@ impl Field {
                 gate_in.into_floating_input(),
                 gate_out.into_push_pull_output(),
             )),
+            display: Some(display),
         }
     }
 
@@ -348,6 +338,14 @@ impl Field {
     /// Will panic if done more than once.
     pub fn split_gates(&mut self) -> FieldGates {
         self.gates.take().unwrap()
+    }
+
+    /// Get the display.
+    ///
+    /// # Panics
+    /// Will panic if done more than once.
+    pub fn split_display(&mut self) -> FieldDisplay {
+        self.display.take().unwrap()
     }
 }
 
