@@ -1,4 +1,10 @@
-use embedded_graphics::{fonts::Font6x8, prelude::*};
+use embedded_graphics::{
+    fonts::{Font6x8, Text},
+    pixelcolor::BinaryColor,
+    prelude::*,
+    style::{TextStyle, TextStyleBuilder},
+};
+
 use hal::prelude::*;
 use shift::{Delay as ShiftDelay, ShiftClockDelay, ShiftIn};
 use stm32h7xx_hal as hal;
@@ -278,8 +284,18 @@ impl Field {
         disp.reset(&mut reset, delay).unwrap();
         disp.init().unwrap();
         disp.flush().unwrap();
-        disp.set_pixel(10, 20, 1);
-        disp.set_pixel(10, 21, 1);
+
+        let style: TextStyle<_, Font6x8> = TextStyleBuilder::new(Font6x8)
+            .text_color(BinaryColor::On)
+            .background_color(BinaryColor::Off)
+            .build();
+
+        let text = Text::new("Hello Daisy!", Point::new(0, 0)).into_styled(style);
+        text.draw(&mut disp).unwrap();
+
+        let text = Text::new(" - Rust", Point::new(0, 10)).into_styled(style);
+        text.draw(&mut disp).unwrap();
+
         disp.flush().unwrap();
 
         Self {
