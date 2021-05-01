@@ -7,10 +7,11 @@ use embedded_graphics::{
     fonts::{Font6x8, Text},
     pixelcolor::BinaryColor,
     prelude::*,
-    style::{TextStyle, TextStyleBuilder},
+    primitives::Circle,
+    style::{PrimitiveStyle, TextStyle, TextStyleBuilder},
 };
 use libdaisy::{
-    field::{Field, FieldKeyboard, FieldLeds, FieldSwitches},
+    field::{Field, FieldKeyboard, FieldLeds, FieldSwitches, FIELD_DISPLAY_SIZE},
     gpio, logger,
     prelude::*,
     system::System,
@@ -137,8 +138,24 @@ const APP: () = {
         let text = Text::new("Hello Daisy!", Point::new(0, 0)).into_styled(style);
         text.draw(&mut disp).unwrap();
 
+        let style: TextStyle<_, Font6x8> = TextStyleBuilder::new(Font6x8)
+            .text_color(BinaryColor::On)
+            .background_color(BinaryColor::Off)
+            .build();
+
         let text = Text::new(" - Rust", Point::new(0, 10)).into_styled(style);
         text.draw(&mut disp).unwrap();
+
+        let w = 8;
+        let c = Circle::new(
+            Point::new(
+                ((FIELD_DISPLAY_SIZE.0 - w) / 2) as _,
+                ((FIELD_DISPLAY_SIZE.1 - w) / 2) as _,
+            ),
+            w as u32,
+        )
+        .into_styled(PrimitiveStyle::with_fill(BinaryColor::On));
+        c.draw(&mut disp).unwrap();
 
         disp.flush().unwrap();
 
