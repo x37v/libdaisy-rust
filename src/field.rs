@@ -8,13 +8,8 @@ const LED_ADDR0: u8 = BASE_ADDR | 0x00;
 const LED_ADDR1: u8 = BASE_ADDR | 0x02;
 
 const PCA9685_MODE1: u8 = 0x00; // location for Mode1 register address
-const PCA9685_MODE2: u8 = 0x01; // location for Mode2 reigster address
 const PCA9685_LED0: u8 = 0x06; // location for start of LED0 registers
-const PRE_SCALE_MODE: u8 = 0xFE; //location for setting prescale (clock speed)
-
 const PCA9685_AUTO_INC: u8 = 0b0010_0000;
-
-const PCA9685_INV: u8 = 0b0001_0000;
 
 /// Display Size width, height
 pub const FIELD_DISPLAY_SIZE: (usize, usize) = (128, 64);
