@@ -1,4 +1,4 @@
-use hal::prelude::*;
+use hal::{gpio::Analog, prelude::*};
 use shift::{Delay as ShiftDelay, ShiftClockDelay, ShiftIn};
 use stm32h7xx_hal as hal;
 
@@ -184,8 +184,8 @@ impl FieldLeds {
     pub fn new(
         i2cd: hal::stm32::I2C1,
         i2crec: hal::rcc::rec::I2c1,
-        scl: hal::gpio::gpiob::PB8<hal::gpio::Analog>,
-        sda: hal::gpio::gpiob::PB9<hal::gpio::Analog>,
+        scl: hal::gpio::gpiob::PB8<Analog>,
+        sda: hal::gpio::gpiob::PB9<Analog>,
         clocks: &hal::rcc::CoreClocks,
     ) -> Self {
         let mut i2c = i2cd.i2c(
@@ -241,35 +241,35 @@ impl Field {
         //leds
         i2c_dev: hal::stm32::I2C1,
         i2c_rec: hal::rcc::rec::I2c1,
-        i2c_scl: hal::gpio::gpiob::PB8<hal::gpio::Analog>,
-        i2c_sda: hal::gpio::gpiob::PB9<hal::gpio::Analog>,
+        i2c_scl: hal::gpio::gpiob::PB8<Analog>,
+        i2c_sda: hal::gpio::gpiob::PB9<Analog>,
 
         //switches
-        sw1: hal::gpio::gpiob::PB15<hal::gpio::Analog>,
-        sw2: hal::gpio::gpiob::PB14<hal::gpio::Analog>,
+        sw1: hal::gpio::gpiob::PB15<Analog>,
+        sw2: hal::gpio::gpiob::PB14<Analog>,
 
         //keyboard
-        keyboard_data: hal::gpio::gpiod::PD11<hal::gpio::Analog>,
-        keyboard_latch: hal::gpio::gpiog::PG9<hal::gpio::Analog>,
-        keyboard_clock: hal::gpio::gpioa::PA2<hal::gpio::Analog>,
+        keyboard_data: hal::gpio::gpiod::PD11<Analog>,
+        keyboard_latch: hal::gpio::gpiog::PG9<Analog>,
+        keyboard_clock: hal::gpio::gpioa::PA2<Analog>,
 
         //gates
-        gate_in: hal::gpio::gpiob::PB12<hal::gpio::Analog>,
-        gate_out: hal::gpio::gpioc::PC0<hal::gpio::Analog>,
+        gate_in: hal::gpio::gpiob::PB12<Analog>,
+        gate_out: hal::gpio::gpioc::PC0<Analog>,
 
         //midi
-        midi_tx: crate::gpio::Daisy13<hal::gpio::Analog>,
-        midi_rx: crate::gpio::Daisy14<hal::gpio::Analog>,
+        midi_tx: crate::gpio::Daisy13<Analog>,
+        midi_rx: crate::gpio::Daisy14<Analog>,
         usart1_d: hal::stm32::USART1,
         usart1_p: hal::rcc::rec::Usart1,
 
         //oled display
         oled_spi_dev: hal::stm32::SPI1,
         oled_spi_rec: hal::rcc::rec::Spi1,
-        oled_nss: hal::gpio::gpiog::PG10<hal::gpio::Analog>,
-        oled_sck: hal::gpio::gpiog::PG11<hal::gpio::Analog>,
+        oled_nss: hal::gpio::gpiog::PG10<Analog>,
+        oled_sck: hal::gpio::gpiog::PG11<Analog>,
         oled_cmd: hal::gpio::gpiob::PB4<hal::gpio::Alternate<hal::gpio::AF0>>,
-        oled_mosi: hal::gpio::gpiob::PB5<hal::gpio::Analog>,
+        oled_mosi: hal::gpio::gpiob::PB5<Analog>,
 
         //clocks
         delay: &mut hal::delay::Delay,
@@ -396,9 +396,9 @@ type ShiftKeyboard = ShiftIn<
 
 impl FieldKeyboard {
     pub fn new(
-        data: hal::gpio::gpiod::PD11<hal::gpio::Analog>,
-        latch: hal::gpio::gpiog::PG9<hal::gpio::Analog>,
-        clock: hal::gpio::gpioa::PA2<hal::gpio::Analog>,
+        data: hal::gpio::gpiod::PD11<Analog>,
+        latch: hal::gpio::gpiog::PG9<Analog>,
+        clock: hal::gpio::gpioa::PA2<Analog>,
     ) -> Self {
         let latch = latch.into_push_pull_output();
         let clock = clock.into_push_pull_output();
