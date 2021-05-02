@@ -1,4 +1,4 @@
-/// Setup for the Daisy Field.
+//! Setup for the Daisy Field.
 use shift::{Delay as ShiftDelay, ShiftClockDelay, ShiftIn};
 use stm32h7xx_hal::{self as hal, gpio::Analog, prelude::*};
 
