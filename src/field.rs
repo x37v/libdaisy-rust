@@ -1,6 +1,5 @@
-use hal::{gpio::Analog, prelude::*};
 use shift::{Delay as ShiftDelay, ShiftClockDelay, ShiftIn};
-use stm32h7xx_hal as hal;
+use stm32h7xx_hal::{self as hal, gpio::Analog, prelude::*};
 
 type I2CWrite = dyn hal::hal::blocking::i2c::Write<Error = hal::i2c::Error>;
 
