@@ -112,6 +112,11 @@ const APP: () = {
             //gates
             gpio.daisy0.take().unwrap(),
             gpio.daisy15.take().unwrap(),
+            //midi
+            gpio.daisy13.take().unwrap(),
+            gpio.daisy14.take().unwrap(),
+            device.USART1,
+            ccdr.peripheral.USART1,
             //oled display
             device.SPI1,
             ccdr.peripheral.SPI1,

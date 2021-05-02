@@ -55,6 +55,8 @@ pub type FieldDisplay = ssd1309::prelude::GraphicsMode<
     >,
 >;
 
+pub type FieldSerialMIDI = hal::serial::Serial<hal::stm32::USART1>;
+
 pub struct FieldLeds {
     i2c: hal::i2c::I2c<hal::stm32::I2C1>,
     drivers: [LedDriver; 2],
@@ -66,6 +68,7 @@ pub struct Field {
     switches: Option<FieldSwitches>,
     gates: Option<FieldGates>,
     display: Option<FieldDisplay>,
+    serial_midi: Option<FieldSerialMIDI>,
 }
 
 #[derive(Clone, Copy)]
@@ -254,6 +257,12 @@ impl Field {
         gate_in: hal::gpio::gpiob::PB12<hal::gpio::Analog>,
         gate_out: hal::gpio::gpioc::PC0<hal::gpio::Analog>,
 
+        //midi
+        midi_tx: crate::gpio::Daisy13<hal::gpio::Analog>,
+        midi_rx: crate::gpio::Daisy14<hal::gpio::Analog>,
+        usart1_d: hal::stm32::USART1,
+        usart1_p: hal::rcc::rec::Usart1,
+
         //oled display
         oled_spi_dev: hal::stm32::SPI1,
         oled_spi_rec: hal::rcc::rec::Spi1,
@@ -290,6 +299,17 @@ impl Field {
         display.init().unwrap();
         display.flush().unwrap();
 
+        let serial_midi = usart1_d
+            .serial(
+                (midi_tx.into_alternate_af7(), midi_rx.into_alternate_af7()),
+                stm32h7xx_hal::serial::config::Config::default()
+                    .baudrate(31_250.bps())
+                    .parity_none(),
+                usart1_p,
+                &clocks,
+            )
+            .unwrap();
+
         Self {
             leds: Some(FieldLeds::new(i2c_dev, i2c_rec, i2c_scl, i2c_sda, clocks)),
             keyboard: Some(FieldKeyboard::new(
@@ -303,6 +323,7 @@ impl Field {
                 gate_out.into_push_pull_output(),
             )),
             display: Some(display),
+            serial_midi: Some(serial_midi),
         }
     }
 
@@ -341,6 +362,14 @@ impl Field {
     /// Will panic if done more than once.
     pub fn split_gates(&mut self) -> FieldGates {
         self.gates.take().unwrap()
+    }
+
+    /// Get the serial MIDI device.
+    ///
+    /// # Panics
+    /// Will panic if done more than once.
+    pub fn split_serial_midi(&mut self) -> FieldSerialMIDI {
+        self.serial_midi.take().unwrap()
     }
 
     /// Get the display.
