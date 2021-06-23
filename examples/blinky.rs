@@ -31,6 +31,14 @@ const APP: () = {
 
         system.timer2.set_freq(500.ms());
 
+        /*
+        let mut qspi = system.flash;
+        qspi.write(0x00, &[0xAA, 0x00, 0xFF]).unwrap();
+
+        let mut read: [u8; 3] = [0; 3];
+        qspi.read(0xFF, &mut read).unwrap();
+        */
+
         init::LateResources {
             seed_led: system.gpio.led,
             timer2: system.timer2,

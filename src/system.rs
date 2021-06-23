@@ -41,6 +41,7 @@ pub struct System {
     pub adc2: adc::Adc<stm32::ADC2, adc::Disabled>,
     pub timer2: Timer<TIM2>,
     pub sdram: &'static mut [f32],
+    pub flash: stm32h7xx_hal::xspi::Qspi<stm32h7xx_hal::stm32::QUADSPI>,
 }
 
 impl System {
@@ -253,6 +254,19 @@ impl System {
 
         info!("System init done!");
 
+        //setup flash
+        let flash = crate::flash::init(
+            device.QUADSPI,
+            ccdr.peripheral.QSPI,
+            &ccdr.clocks,
+            gpiof.pf6,
+            gpiof.pf7,
+            gpiof.pf8,
+            gpiof.pf9,
+            gpiof.pf10,
+            gpiog.pg6,
+        );
+
         System {
             gpio,
             audio,
@@ -262,6 +276,7 @@ impl System {
             adc2,
             timer2,
             sdram,
+            flash,
         }
     }
 }
