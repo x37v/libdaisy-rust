@@ -17,13 +17,13 @@ use stm32h7xx_hal::{
     hal::digital::v2::OutputPin,
     prelude::*,
     rcc,
-    xspi::{Config, QspiMode},
+    xspi::{Config, QspiMode, QspiWord},
 };
 
 /// Initialize the flash quad spi interface
 pub fn init(
-    qspi: stm32h7xx_hal::device::QUADSPI,
-    qspi_clock: rcc::rec::Qspi,
+    regs: stm32h7xx_hal::device::QUADSPI,
+    prec: rcc::rec::Qspi,
     clocks: &rcc::CoreClocks,
     pf6: gpiof::PF6<Analog>,
     pf7: gpiof::PF7<Analog>,
@@ -33,7 +33,6 @@ pub fn init(
     pg6: gpiog::PG6<Analog>,
 ) -> stm32h7xx_hal::xspi::Qspi<stm32h7xx_hal::stm32::QUADSPI> {
     let mut cs = pg6.into_open_drain_output();
-    cs.set_high().unwrap();
 
     let sck = pf10.into_alternate_af9();
     let io0 = pf8.into_alternate_af10();
@@ -41,7 +40,13 @@ pub fn init(
     let io2 = pf7.into_alternate_af9();
     let io3 = pf6.into_alternate_af9();
 
-    let config = Config::new(133.mhz()).mode(QspiMode::FourBit);
-
-    qspi.bank1((sck, io0, io1, io2, io3), config, &clocks, qspi_clock)
+    let config = Config::new(133.mhz()).mode(QspiMode::OneBit);
+    let mut qspi = regs.bank1((sck, io0, io1, io2, io3), config, &clocks, prec);
+    cs.set_high().unwrap();
+    qspi.write_extended(QspiWord::U8(0x35), QspiWord::None, QspiWord::None, &[])
+        .unwrap();
+    while qspi.is_busy().is_err() {}
+    cs.set_low().unwrap();
+    qspi.configure_mode(QspiMode::FourBit).unwrap();
+    qspi
 }
