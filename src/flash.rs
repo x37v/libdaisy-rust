@@ -96,14 +96,6 @@ impl Flash {
         */
 
         /*
-        //enable write
-
-        //setup in qspi mode
-        qspi.write_extended(QspiWord::U8(0x35), QspiWord::None, QspiWord::None, &[])
-            .unwrap();
-        qspi.configure_mode(QspiMode::FourBit).unwrap();
-        */
-
         //read info
         let mut info: [u8; 3] = [0; 3];
         while qspi.is_busy().is_err() {}
@@ -116,9 +108,29 @@ impl Flash {
         )
         .unwrap();
 
+        //read status
+        let mut status: [u8; 1] = [0xFF];
+        while qspi.is_busy().is_err() {}
+        qspi.read_extended(
+            QspiWord::U8(0x05),
+            QspiWord::None,
+            QspiWord::None,
+            0,
+            &mut status,
+        )
+        .unwrap();
+        */
+
+        //enable write
         while qspi.is_busy().is_err() {}
         qspi.write_extended(QspiWord::U8(0x06), QspiWord::None, QspiWord::None, &[])
             .unwrap();
+
+        //enable quadspi
+        while qspi.is_busy().is_err() {}
+        qspi.write_extended(QspiWord::U8(0x35), QspiWord::None, QspiWord::None, &[])
+            .unwrap();
+        qspi.configure_mode(QspiMode::FourBit).unwrap();
 
         //read status
         let mut status: [u8; 1] = [0xFF];
@@ -129,6 +141,17 @@ impl Flash {
             QspiWord::None,
             0,
             &mut status,
+        )
+        .unwrap();
+
+        let mut info: [u8; 3] = [0; 3];
+        while qspi.is_busy().is_err() {}
+        qspi.read_extended(
+            QspiWord::U8(0x9F),
+            QspiWord::None,
+            QspiWord::None,
+            0,
+            &mut info,
         )
         .unwrap();
 
