@@ -19,7 +19,20 @@ use stm32h7xx_hal::{
     xspi::{Config, QspiError, QspiMode, QspiWord},
 };
 
-type FlashResult<T> = Result<T, QspiError>;
+pub type FlashResult<T> = Result<T, QspiError>;
+
+/// Enum describing flash erasure.
+#[derive(Clone, Copy)]
+pub enum FlashErase {
+    ///The whole chip
+    Chip,
+    ///4Kbyte sector
+    Sector4K(u16),
+    ///32Kbyte block
+    Block32K(u8),
+    ///64Kbyte block
+    Block64K(u8),
+}
 
 pub struct Flash {
     qspi: stm32h7xx_hal::xspi::Qspi<stm32h7xx_hal::stm32::QUADSPI>,
@@ -152,6 +165,67 @@ impl Flash {
         flash.write_reg(0x01, 0b0000_0010).unwrap();
         flash.wait_write().unwrap();
         flash.assert_info();
+
+        //setup read parameters, no wrap, default strength,  default burst, 8 dummy cycles
+        //pg 19
+        flash.enable_write().unwrap();
+        flash.write_reg(0xC0, 0b1111_1000).unwrap();
+        flash.wait_write().unwrap();
+
         flash
+    }
+
+    /// Erase all or some of the chip (setting all bits to `1`).
+    ///
+    /// Remarks:
+    /// - The memory array of the IS25LP064A/032A is organized into uniform 4 Kbyte sectors or
+    /// 32/64 Kbyte uniform blocks (a block consists of eight/sixteen adjacent sectors
+    /// respectively).
+    pub fn erase(&mut self, op: FlashErase) -> FlashResult<()> {
+        self.enable_write()?;
+        self.wait();
+        match op {
+            FlashErase::Chip => self.write_command(0x60),
+            FlashErase::Sector4K(s) => {
+                assert!(s <= 2047);
+                self.qspi.write_extended(
+                    QspiWord::U8(0xD7),
+                    QspiWord::U24(s as _),
+                    QspiWord::None,
+                    &[],
+                )
+            }
+            FlashErase::Block32K(b) => self.qspi.write_extended(
+                QspiWord::U8(0x52),
+                QspiWord::U24(b as _),
+                QspiWord::None,
+                &[],
+            ),
+            FlashErase::Block64K(b) => {
+                assert!(b <= 127);
+                self.qspi.write_extended(
+                    QspiWord::U8(0xD8),
+                    QspiWord::U24(b as _),
+                    QspiWord::None,
+                    &[],
+                )
+            }
+        }?;
+        self.wait_write()
+    }
+
+    pub fn read(&mut self, addr: u32, data: &mut [u8]) -> FlashResult<()> {
+        //see page 34 for allowing to skip instruction
+        //TODO allow reading more than 32 bytes
+        assert!(data.len() <= 32);
+        assert!((addr as usize + data.len()) < 0x800000);
+        self.wait();
+        self.qspi.read_extended(
+            QspiWord::U8(0xEB),
+            QspiWord::U24(addr),
+            QspiWord::U8(0x00), //only A in top byte does anything
+            8,
+            data,
+        )
     }
 }
