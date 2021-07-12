@@ -16,8 +16,10 @@ use stm32h7xx_hal::{
     gpio::{gpiof, gpiog, Analog, Speed},
     prelude::*,
     rcc,
-    xspi::{Config, QspiMode, QspiWord},
+    xspi::{Config, QspiError, QspiMode, QspiWord},
 };
+
+type FlashResult<T> = Result<T, QspiError>;
 
 pub struct Flash {
     qspi: stm32h7xx_hal::xspi::Qspi<stm32h7xx_hal::stm32::QUADSPI>,
@@ -53,6 +55,68 @@ pub struct Flash {
 */
 
 impl Flash {
+    fn wait(&mut self) {
+        while self.qspi.is_busy().is_err() {}
+    }
+
+    fn wait_write(&mut self) -> FlashResult<()> {
+        loop {
+            match self.status() {
+                Ok(status) => {
+                    if status & 0x01 == 0 {
+                        return Ok(());
+                    }
+                }
+                Err(e) => return Err(e),
+            }
+        }
+    }
+
+    fn write_command(&mut self, cmd: u8) -> FlashResult<()> {
+        self.wait();
+        self.qspi
+            .write_extended(QspiWord::U8(cmd), QspiWord::None, QspiWord::None, &[])
+    }
+
+    fn write_reg(&mut self, cmd: u8, data: u8) -> FlashResult<()> {
+        self.wait();
+        self.qspi
+            .write_extended(QspiWord::U8(cmd), QspiWord::None, QspiWord::None, &[data])
+    }
+
+    fn enable_write(&mut self) -> FlashResult<()> {
+        self.write_command(0x06)
+    }
+
+    fn assert_info(&mut self) {
+        let mut info: [u8; 3] = [0; 3];
+        self.wait();
+        self.qspi
+            .read_extended(
+                QspiWord::U8(0x9F),
+                QspiWord::None,
+                QspiWord::None,
+                0,
+                &mut info,
+            )
+            .unwrap();
+        assert_eq!(&info, &[157, 96, 23]);
+    }
+
+    fn status(&mut self) -> FlashResult<u8> {
+        let mut status: [u8; 1] = [0xFF];
+        self.wait();
+        self.qspi
+            .read_extended(
+                QspiWord::U8(0x05),
+                QspiWord::None,
+                QspiWord::None,
+                0,
+                &mut status,
+            )
+            .map(|_| status[0])
+    }
+
     /// Initialize the flash quad spi interface
     pub fn new(
         regs: stm32h7xx_hal::device::QUADSPI,
@@ -65,97 +129,29 @@ impl Flash {
         pf10: gpiof::PF10<Analog>,
         pg6: gpiog::PG6<Analog>,
     ) -> Self {
-        //let rcc = unsafe { &*stm32h7xx_hal::stm32::RCC::ptr() };
-        //rcc.ahb3enr.modify(|_, w| w.qspien().set_bit());
+        let _ncs = pg6.into_alternate_af10().set_speed(Speed::VeryHigh); //QUADSPI_BK1_NCS
 
-        let _ncs = pg6.into_alternate_af10(); //QUADSPI_BK1_NCS
+        let sck = pf10.into_alternate_af9().set_speed(Speed::VeryHigh);
+        let io0 = pf8.into_alternate_af10().set_speed(Speed::VeryHigh);
+        let io1 = pf9.into_alternate_af10().set_speed(Speed::VeryHigh);
+        let io2 = pf7.into_alternate_af9().set_speed(Speed::VeryHigh);
+        let io3 = pf6.into_alternate_af9().set_speed(Speed::VeryHigh);
 
-        let sck = pf10.into_alternate_af9();
-        let io0 = pf8.into_alternate_af10();
-        let io1 = pf9.into_alternate_af10();
-        let io2 = pf7.into_alternate_af9();
-        let io3 = pf6.into_alternate_af9();
+        let config = Config::new(133.mhz()).mode(QspiMode::OneBit);
+        let qspi = regs.bank1((sck, io0, io1, io2, io3), config, &clocks, prec);
 
-        let config = Config::new(1.mhz()).mode(QspiMode::OneBit);
-        let mut qspi = regs.bank1((sck, io0, io1, io2, io3), config, &clocks, prec);
+        let mut flash = Flash { qspi };
 
-        /*
-        //read info
-        let mut info: [u8; 3] = [0xFF; 3];
-        while qspi.is_busy().is_err() {}
-        qspi.read(0x9F, &mut info).unwrap();
+        //enable quad
+        flash.enable_write().unwrap();
+        flash.write_command(0x35).unwrap();
+        flash.qspi.configure_mode(QspiMode::FourBit).unwrap();
 
-        //read status
-        let mut status: [u8; 1] = [0xFF];
-        while qspi.is_busy().is_err() {}
-        qspi.read(0x05, &mut status).unwrap();
-
-        let mut funct: [u8; 1] = [0xFF];
-        while qspi.is_busy().is_err() {}
-        qspi.read(0x48, &mut funct).unwrap();
-        */
-
-        /*
-        //read info
-        let mut info: [u8; 3] = [0; 3];
-        while qspi.is_busy().is_err() {}
-        qspi.read_extended(
-            QspiWord::U8(0x9F),
-            QspiWord::None,
-            QspiWord::None,
-            0,
-            &mut info,
-        )
-        .unwrap();
-
-        //read status
-        let mut status: [u8; 1] = [0xFF];
-        while qspi.is_busy().is_err() {}
-        qspi.read_extended(
-            QspiWord::U8(0x05),
-            QspiWord::None,
-            QspiWord::None,
-            0,
-            &mut status,
-        )
-        .unwrap();
-        */
-
-        //enable write
-        while qspi.is_busy().is_err() {}
-        qspi.write_extended(QspiWord::U8(0x06), QspiWord::None, QspiWord::None, &[])
-            .unwrap();
-
-        //enable quadspi
-        while qspi.is_busy().is_err() {}
-        qspi.write_extended(QspiWord::U8(0x35), QspiWord::None, QspiWord::None, &[])
-            .unwrap();
-        qspi.configure_mode(QspiMode::FourBit).unwrap();
-
-        //read status
-        let mut status: [u8; 1] = [0xFF];
-        while qspi.is_busy().is_err() {}
-        qspi.read_extended(
-            QspiWord::U8(0x05),
-            QspiWord::None,
-            QspiWord::None,
-            0,
-            &mut status,
-        )
-        .unwrap();
-
-        let mut info: [u8; 3] = [0; 3];
-        while qspi.is_busy().is_err() {}
-        qspi.read_extended(
-            QspiWord::U8(0x9F),
-            QspiWord::None,
-            QspiWord::None,
-            0,
-            &mut info,
-        )
-        .unwrap();
-
-        while qspi.is_busy().is_err() {}
-        Flash { qspi }
+        flash.enable_write().unwrap();
+        //only enable write, nothing else
+        flash.write_reg(0x01, 0b0000_0010).unwrap();
+        flash.wait_write().unwrap();
+        flash.assert_info();
+        flash
     }
 }

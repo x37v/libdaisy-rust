@@ -41,7 +41,7 @@ pub struct System {
     pub adc2: adc::Adc<stm32::ADC2, adc::Disabled>,
     pub timer2: Timer<TIM2>,
     pub sdram: &'static mut [f32],
-    pub flash: stm32h7xx_hal::xspi::Qspi<stm32h7xx_hal::stm32::QUADSPI>,
+    pub flash: crate::flash::Flash,
 }
 
 impl System {
@@ -50,6 +50,7 @@ impl System {
         // Power
         let pwr = pwr.constrain();
         let vos = pwr.vos0(syscfg).freeze();
+
         rcc.constrain()
             .use_hse(HSE_CLOCK_MHZ)
             .sys_ck(CLOCK_RATE_HZ)
@@ -255,7 +256,7 @@ impl System {
         info!("System init done!");
 
         //setup flash
-        let flash = crate::flash::init(
+        let flash = crate::flash::Flash::new(
             device.QUADSPI,
             ccdr.peripheral.QSPI,
             &ccdr.clocks,
