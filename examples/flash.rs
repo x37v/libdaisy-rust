@@ -37,20 +37,27 @@ const APP: () = {
         flash.erase(FlashErase::Sector4K(0)).unwrap();
 
         //read, should be all 0xFF
-        let mut r = [0x0; 32];
+        let mut r = [0x0; 64];
         flash.read(0, &mut r).unwrap();
         assert_eq!(r[0], 0xFF);
         assert_eq!(r[31], 0xFF);
 
+        flash.program(0, &[0x42]).unwrap();
         //can program over 1s
-        flash.program(0, &[0x1, 0xFF]).unwrap();
-        flash.program(1, &[0x2, 0x3]).unwrap();
+        flash.program(32, &[0x1, 0xFF]).unwrap();
+        flash.program(33, &[0x2, 0x3]).unwrap();
 
         //read the new values
         flash.read(0, &mut r).unwrap();
-        assert_eq!(r[0], 0x1);
-        assert_eq!(r[1], 0x2);
-        assert_eq!(r[2], 0x3);
+        assert_eq!(r[0], 0x42);
+        assert_eq!(r[32], 0x1);
+        assert_eq!(r[33], 0x2);
+        assert_eq!(r[34], 0x3);
+
+        r[35] = 0x91;
+        flash.program(0, &r).unwrap();
+        flash.read(0, &mut r).unwrap();
+        assert_eq!(r[35], 0x91);
 
         init::LateResources {
             seed_led: system.gpio.led,
