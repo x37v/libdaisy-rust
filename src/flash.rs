@@ -21,7 +21,7 @@ use stm32h7xx_hal::{
 
 pub type FlashResult<T> = Result<T, QspiError>;
 
-/// Enum describing flash erasure.
+/// Flash erasure enum
 #[derive(Clone, Copy)]
 pub enum FlashErase {
     ///The whole chip
@@ -34,6 +34,7 @@ pub enum FlashErase {
     Block64K(u8),
 }
 
+/// Flash memory peripheral
 pub struct Flash {
     qspi: stm32h7xx_hal::xspi::Qspi<stm32h7xx_hal::stm32::QUADSPI>,
 }
@@ -166,7 +167,7 @@ impl Flash {
         flash.wait_write().unwrap();
         flash.assert_info();
 
-        //setup read parameters, no wrap, default strength,  default burst, 8 dummy cycles
+        //setup read parameters, no wrap, default strength, default burst, 8 dummy cycles
         //pg 19
         flash.enable_write().unwrap();
         flash.write_reg(0xC0, 0b1111_1000).unwrap();
@@ -175,9 +176,10 @@ impl Flash {
         flash
     }
 
-    /// Erase all or some of the chip (setting all bits to `1`).
+    /// Erase all or some of the chip.
     ///
     /// Remarks:
+    /// - Erasing sets all the bits in the given area to `1`.
     /// - The memory array of the IS25LP064A/032A is organized into uniform 4 Kbyte sectors or
     /// 32/64 Kbyte uniform blocks (a block consists of eight/sixteen adjacent sectors
     /// respectively).
@@ -214,33 +216,48 @@ impl Flash {
         self.wait_write()
     }
 
-    pub fn read(&mut self, addr: u32, data: &mut [u8]) -> FlashResult<()> {
+    /// Read `data` out of the flash starting at the given `address`
+    pub fn read(&mut self, address: u32, data: &mut [u8]) -> FlashResult<()> {
+        let mut addr = address;
         //see page 34 for allowing to skip instruction
-        //TODO allow reading more than 32 bytes
-        assert!(data.len() <= 32);
         assert!((addr as usize + data.len()) < 0x800000);
-        self.wait();
-        self.qspi.read_extended(
-            QspiWord::U8(0xEB),
-            QspiWord::U24(addr),
-            QspiWord::U8(0x00), //only A in top byte does anything
-            8,
-            data,
-        )
+        for chunk in data.chunks_mut(32) {
+            self.wait();
+            self.qspi.read_extended(
+                QspiWord::U8(0xEB),
+                QspiWord::U24(addr),
+                QspiWord::U8(0x00), //only A in top byte does anything
+                8,
+                chunk,
+            )?;
+            addr += 32;
+        }
+        Ok(())
     }
 
-    pub fn program(&mut self, addr: u32, data: &[u8]) -> FlashResult<()> {
-        //TODO allow reading more than 32 bytes
-        assert!(data.len() <= 32);
+    /// Program `data` into the flash starting at the given `address`
+    ///
+    /// Remarks:
+    /// - This operation can only set 1s to 0s, you must use `erase` to set a 0 to a 1.
+    /// - The starting byte can be anywhere within the page (256 byte chunk). When the end of the
+    /// page is reached, the address will wrap around to the beginning of the same page. If the
+    /// data to be programmed are less than a full page, the data of all other bytes on the same
+    /// page will remain unchanged.
+    pub fn program(&mut self, address: u32, data: &[u8]) -> FlashResult<()> {
+        let mut addr = address;
         assert!((addr as usize + data.len()) < 0x800000);
-        self.enable_write()?;
-        self.wait();
-        self.qspi.write_extended(
-            QspiWord::U8(0x02),
-            QspiWord::U24(addr),
-            QspiWord::None,
-            data,
-        )?;
-        self.wait_write()
+        for chunk in data.chunks(32) {
+            self.enable_write()?;
+            self.wait();
+            self.qspi.write_extended(
+                QspiWord::U8(0x02),
+                QspiWord::U24(addr),
+                QspiWord::None,
+                chunk,
+            )?;
+            self.wait_write()?;
+            addr += 32;
+        }
+        Ok(())
     }
 }
