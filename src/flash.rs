@@ -228,4 +228,19 @@ impl Flash {
             data,
         )
     }
+
+    pub fn program(&mut self, addr: u32, data: &[u8]) -> FlashResult<()> {
+        //TODO allow reading more than 32 bytes
+        assert!(data.len() <= 32);
+        assert!((addr as usize + data.len()) < 0x800000);
+        self.enable_write()?;
+        self.wait();
+        self.qspi.write_extended(
+            QspiWord::U8(0x02),
+            QspiWord::U24(addr),
+            QspiWord::None,
+            data,
+        )?;
+        self.wait_write()
+    }
 }
