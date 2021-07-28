@@ -21,8 +21,7 @@ log = "0.4.11"
 micromath = "1.1.1"
 panic-halt = "0.2.0"
 #stm32h7xx-hal = { version = "0.9.0", features = ["stm32h750v","rt","fmc", "quadspi"] }
-stm32h7xx-hal = { git = "https://github.com/richardeoin/stm32h7xx-hal.git", branch="octospi-pr", features = ["stm32h750v","rt","fmc", "xspi"] }
-#stm32h7xx-hal = { path = "/home/alex/projects/rust/stm32h7xx-hal/", features = ["stm32h750v","rt","fmc", "xspi"] }
+stm32h7xx-hal = { git = "https://github.com/x37v/stm32h7xx-hal.git", branch="xnor/octospi", features = ["stm32h750v","rt","fmc", "xspi"] }
 stm32-fmc = "0.2.2"
 rtt-target = { version = "0.3.0", features = ["cortex-m"], optional = true }
 panic-rtt-target = { version = "0.1.1", features = ["cortex-m"], optional = true }
