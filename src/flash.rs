@@ -89,13 +89,13 @@ impl Flash {
     fn write_command(&mut self, cmd: u8) -> FlashResult<()> {
         self.wait();
         self.qspi
-            .write_extended(QspiWord::U8(cmd), QspiWord::None, QspiWord::None, &[])
+            .write_extended(Some(cmd), QspiWord::None, QspiWord::None, &[])
     }
 
     fn write_reg(&mut self, cmd: u8, data: u8) -> FlashResult<()> {
         self.wait();
         self.qspi
-            .write_extended(QspiWord::U8(cmd), QspiWord::None, QspiWord::None, &[data])
+            .write_extended(Some(cmd), QspiWord::None, QspiWord::None, &[data])
     }
 
     fn enable_write(&mut self) -> FlashResult<()> {
@@ -106,13 +106,7 @@ impl Flash {
         let mut info: [u8; 3] = [0; 3];
         self.wait();
         self.qspi
-            .read_extended(
-                QspiWord::U8(0x9F),
-                QspiWord::None,
-                QspiWord::None,
-                0,
-                &mut info,
-            )
+            .read_extended(Some(0x9F), QspiWord::None, QspiWord::None, 0, &mut info)
             .unwrap();
         assert_eq!(&info, &[157, 96, 23]);
     }
@@ -121,13 +115,7 @@ impl Flash {
         let mut status: [u8; 1] = [0xFF];
         self.wait();
         self.qspi
-            .read_extended(
-                QspiWord::U8(0x05),
-                QspiWord::None,
-                QspiWord::None,
-                0,
-                &mut status,
-            )
+            .read_extended(Some(0x05), QspiWord::None, QspiWord::None, 0, &mut status)
             .map(|_| status[0])
     }
 
@@ -190,27 +178,17 @@ impl Flash {
             FlashErase::Chip => self.write_command(0x60),
             FlashErase::Sector4K(s) => {
                 assert!(s <= 2047);
-                self.qspi.write_extended(
-                    QspiWord::U8(0xD7),
-                    QspiWord::U24(s as _),
-                    QspiWord::None,
-                    &[],
-                )
+                self.qspi
+                    .write_extended(Some(0xD7), QspiWord::U24(s as _), QspiWord::None, &[])
             }
-            FlashErase::Block32K(b) => self.qspi.write_extended(
-                QspiWord::U8(0x52),
-                QspiWord::U24(b as _),
-                QspiWord::None,
-                &[],
-            ),
+            FlashErase::Block32K(b) => {
+                self.qspi
+                    .write_extended(Some(0x52), QspiWord::U24(b as _), QspiWord::None, &[])
+            }
             FlashErase::Block64K(b) => {
                 assert!(b <= 127);
-                self.qspi.write_extended(
-                    QspiWord::U8(0xD8),
-                    QspiWord::U24(b as _),
-                    QspiWord::None,
-                    &[],
-                )
+                self.qspi
+                    .write_extended(Some(0xD8), QspiWord::U24(b as _), QspiWord::None, &[])
             }
         }?;
         self.wait_write()
@@ -224,7 +202,7 @@ impl Flash {
         for chunk in data.chunks_mut(32) {
             self.wait();
             self.qspi.read_extended(
-                QspiWord::U8(0xEB),
+                Some(0xEB),
                 QspiWord::U24(addr),
                 QspiWord::U8(0x00), //only A in top byte does anything
                 8,
@@ -249,12 +227,8 @@ impl Flash {
         for chunk in data.chunks(32) {
             self.enable_write()?;
             self.wait();
-            self.qspi.write_extended(
-                QspiWord::U8(0x02),
-                QspiWord::U24(addr),
-                QspiWord::None,
-                chunk,
-            )?;
+            self.qspi
+                .write_extended(Some(0x02), QspiWord::U24(addr), QspiWord::None, chunk)?;
             self.wait_write()?;
             addr += 32;
         }
