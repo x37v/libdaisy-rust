@@ -14,15 +14,17 @@
 
 use stm32h7xx_hal::{
     gpio::{gpiof, gpiog, Analog, Speed},
+    nb::Error as nbError,
     prelude::*,
     rcc,
     xspi::{Config, QspiError, QspiMode, QspiWord},
 };
 
 pub type FlashResult<T> = Result<T, QspiError>;
+pub type NBFlashResult<T> = stm32h7xx_hal::nb::Result<T, QspiError>;
 
 /// Flash erasure enum
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FlashErase {
     ///The whole chip
     Chip,
@@ -34,9 +36,17 @@ pub enum FlashErase {
     Block64K(u8),
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FlashState {
+    Idle,
+    Programming { address: u32, chunk: u32 },
+    Erasing(FlashErase),
+}
+
 /// Flash memory peripheral
 pub struct Flash {
     qspi: stm32h7xx_hal::xspi::Qspi<stm32h7xx_hal::stm32::QUADSPI>,
+    state: FlashState,
 }
 
 /*
@@ -73,15 +83,17 @@ impl Flash {
         while self.qspi.is_busy().is_err() {}
     }
 
+    fn write_complete(&mut self) -> FlashResult<bool> {
+        match self.status() {
+            Ok(status) => Ok(status & 0x01 == 0),
+            Err(e) => return Err(e),
+        }
+    }
+
     fn wait_write(&mut self) -> FlashResult<()> {
         loop {
-            match self.status() {
-                Ok(status) => {
-                    if status & 0x01 == 0 {
-                        return Ok(());
-                    }
-                }
-                Err(e) => return Err(e),
+            if self.write_complete()? {
+                return Ok(());
             }
         }
     }
@@ -142,7 +154,10 @@ impl Flash {
         let config = Config::new(133.mhz()).mode(QspiMode::OneBit);
         let qspi = regs.bank1((sck, io0, io1, io2, io3), config, &clocks, prec);
 
-        let mut flash = Flash { qspi };
+        let mut flash = Flash {
+            qspi,
+            state: FlashState::Idle,
+        };
 
         //enable quad
         flash.enable_write().unwrap();
@@ -171,31 +186,57 @@ impl Flash {
     /// - The memory array of the IS25LP064A/032A is organized into uniform 4 Kbyte sectors or
     /// 32/64 Kbyte uniform blocks (a block consists of eight/sixteen adjacent sectors
     /// respectively).
-    pub fn erase(&mut self, op: FlashErase) -> FlashResult<()> {
-        self.enable_write()?;
-        self.wait();
-        match op {
-            FlashErase::Chip => self.write_command(0x60),
-            FlashErase::Sector4K(s) => {
-                assert!(s <= 2047);
-                self.qspi
-                    .write_extended(Some(0xD7), QspiWord::U24(s as _), QspiWord::None, &[])
+    pub fn erase(&mut self, op: FlashErase) -> NBFlashResult<()> {
+        match self.state {
+            FlashState::Erasing(e) => {
+                assert_eq!(e, op);
+                if self.write_complete()? {
+                    self.state = FlashState::Idle;
+                    Ok(())
+                } else {
+                    Err(nbError::WouldBlock)
+                }
             }
-            FlashErase::Block32K(b) => {
-                self.qspi
-                    .write_extended(Some(0x52), QspiWord::U24(b as _), QspiWord::None, &[])
+            FlashState::Idle => {
+                self.enable_write()?;
+                self.wait();
+                match op {
+                    FlashErase::Chip => self.write_command(0x60),
+                    FlashErase::Sector4K(s) => {
+                        assert!(s <= 2047);
+                        self.qspi.write_extended(
+                            Some(0xD7),
+                            QspiWord::U24(s as _),
+                            QspiWord::None,
+                            &[],
+                        )
+                    }
+                    FlashErase::Block32K(b) => self.qspi.write_extended(
+                        Some(0x52),
+                        QspiWord::U24(b as _),
+                        QspiWord::None,
+                        &[],
+                    ),
+                    FlashErase::Block64K(b) => {
+                        assert!(b <= 127);
+                        self.qspi.write_extended(
+                            Some(0xD8),
+                            QspiWord::U24(b as _),
+                            QspiWord::None,
+                            &[],
+                        )
+                    }
+                }?;
+                self.state = FlashState::Erasing(op);
+                Err(nbError::WouldBlock)
             }
-            FlashErase::Block64K(b) => {
-                assert!(b <= 127);
-                self.qspi
-                    .write_extended(Some(0xD8), QspiWord::U24(b as _), QspiWord::None, &[])
-            }
-        }?;
-        self.wait_write()
+            _ => panic!("not idle or erasing"),
+        }
     }
 
     /// Read `data` out of the flash starting at the given `address`
     pub fn read(&mut self, address: u32, data: &mut [u8]) -> FlashResult<()> {
+        assert_eq!(self.state, FlashState::Idle);
         let mut addr = address;
         //see page 34 for allowing to skip instruction
         assert!((addr as usize + data.len()) < 0x800000);
@@ -221,17 +262,40 @@ impl Flash {
     /// page is reached, the address will wrap around to the beginning of the same page. If the
     /// data to be programmed are less than a full page, the data of all other bytes on the same
     /// page will remain unchanged.
-    pub fn program(&mut self, address: u32, data: &[u8]) -> FlashResult<()> {
-        let mut addr = address;
-        assert!((addr as usize + data.len()) < 0x800000);
-        for chunk in data.chunks(32) {
-            self.enable_write()?;
-            self.wait();
-            self.qspi
-                .write_extended(Some(0x02), QspiWord::U24(addr), QspiWord::None, chunk)?;
-            self.wait_write()?;
-            addr += 32;
+    pub fn program(&mut self, address: u32, data: &[u8]) -> NBFlashResult<()> {
+        let prog = |flash: &mut Self, chunk_index: u32| -> NBFlashResult<()> {
+            if let Some(chunk) = data.chunks(32).nth(chunk_index as usize) {
+                flash.enable_write()?;
+                flash.wait();
+                flash.qspi.write_extended(
+                    Some(0x02),
+                    QspiWord::U24(address + chunk_index * 32),
+                    QspiWord::None,
+                    chunk,
+                )?;
+                flash.state = FlashState::Programming {
+                    address,
+                    chunk: chunk_index,
+                };
+                Err(nbError::WouldBlock)
+            } else {
+                Ok(())
+            }
+        };
+        match self.state {
+            FlashState::Idle => prog(self, 0),
+            FlashState::Programming {
+                address: addr,
+                chunk,
+            } => {
+                assert_eq!(addr, address);
+                if self.write_complete()? {
+                    prog(self, chunk + 1)
+                } else {
+                    Err(nbError::WouldBlock)
+                }
+            }
+            _ => panic!("invalid state for programming"),
         }
-        Ok(())
     }
 }
