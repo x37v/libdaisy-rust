@@ -131,6 +131,11 @@ impl Flash {
             .map(|_| status[0])
     }
 
+    /// Reset the internal state, only if you know what you're doing
+    pub unsafe fn reset(&mut self) {
+        self.state = FlashState::Idle;
+    }
+
     /// Initialize the flash quad spi interface
     pub fn new(
         regs: stm32h7xx_hal::device::QUADSPI,
