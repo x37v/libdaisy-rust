@@ -279,6 +279,7 @@ impl Flash {
                 };
                 Err(nbError::WouldBlock)
             } else {
+                flash.state = FlashState::Idle;
                 Ok(())
             }
         };
