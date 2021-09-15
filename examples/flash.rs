@@ -2,15 +2,9 @@
 #![no_main]
 #![no_std]
 use log::info;
-// Includes a panic handler and optional logging facilities
-use libdaisy::logger;
 
-use stm32h7xx_hal::stm32;
-use stm32h7xx_hal::timer::Timer;
-
-use libdaisy::gpio;
-use libdaisy::prelude::*;
-use libdaisy::{flash::FlashErase, system};
+use libdaisy::{flash::FlashErase, gpio, logger, prelude::*, system};
+use stm32h7xx_hal::{nb, stm32, timer::Timer};
 
 #[rtic::app(
     device = stm32h7xx_hal::stm32,
@@ -34,7 +28,7 @@ const APP: () = {
         let mut flash = system.flash;
 
         //takes some time
-        flash.erase(FlashErase::Sector4K(0)).unwrap();
+        nb::block!(flash.erase(FlashErase::Sector4K(0))).unwrap();
 
         //read, should be all 0xFF
         let mut r = [0x0; 64];
@@ -42,10 +36,10 @@ const APP: () = {
         assert_eq!(r[0], 0xFF);
         assert_eq!(r[31], 0xFF);
 
-        flash.program(0, &[0x42]).unwrap();
+        nb::block!(flash.program(0, &[0x42])).unwrap();
         //can program over 1s
-        flash.program(32, &[0x1, 0xFF]).unwrap();
-        flash.program(33, &[0x2, 0x3]).unwrap();
+        nb::block!(flash.program(32, &[0x1, 0xFF])).unwrap();
+        nb::block!(flash.program(33, &[0x2, 0x3])).unwrap();
 
         //read the new values
         flash.read(0, &mut r).unwrap();
@@ -55,7 +49,7 @@ const APP: () = {
         assert_eq!(r[34], 0x3);
 
         r[35] = 0x91;
-        flash.program(0, &r).unwrap();
+        nb::block!(flash.program(0, &r)).unwrap();
         flash.read(0, &mut r).unwrap();
         assert_eq!(r[35], 0x91);
 
