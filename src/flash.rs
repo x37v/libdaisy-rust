@@ -28,12 +28,12 @@ pub type NBFlashResult<T> = stm32h7xx_hal::nb::Result<T, QspiError>;
 pub enum FlashErase {
     ///The whole chip
     Chip,
-    ///4Kbyte sector
-    Sector4K(u16),
-    ///32Kbyte block
-    Block32K(u8),
-    ///64Kbyte block
-    Block64K(u8),
+    ///4Kbyte sector address
+    Sector4K(u32),
+    ///32Kbyte block address
+    Block32K(u32),
+    ///64Kbyte block address
+    Block64K(u32),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -207,30 +207,24 @@ impl Flash {
                 self.wait();
                 match op {
                     FlashErase::Chip => self.write_command(0x60),
-                    FlashErase::Sector4K(s) => {
-                        assert!(s <= 2047);
-                        self.qspi.write_extended(
-                            Some(0xD7),
-                            QspiWord::U24(s as _),
-                            QspiWord::None,
-                            &[],
-                        )
-                    }
-                    FlashErase::Block32K(b) => self.qspi.write_extended(
-                        Some(0x52),
-                        QspiWord::U24(b as _),
+                    FlashErase::Sector4K(a) => self.qspi.write_extended(
+                        Some(0xD7),
+                        QspiWord::U24(a as _),
                         QspiWord::None,
                         &[],
                     ),
-                    FlashErase::Block64K(b) => {
-                        assert!(b <= 127);
-                        self.qspi.write_extended(
-                            Some(0xD8),
-                            QspiWord::U24(b as _),
-                            QspiWord::None,
-                            &[],
-                        )
-                    }
+                    FlashErase::Block32K(a) => self.qspi.write_extended(
+                        Some(0x52),
+                        QspiWord::U24(a as _),
+                        QspiWord::None,
+                        &[],
+                    ),
+                    FlashErase::Block64K(a) => self.qspi.write_extended(
+                        Some(0xD8),
+                        QspiWord::U24(a as _),
+                        QspiWord::None,
+                        &[],
+                    ),
                 }?;
                 self.state = FlashState::Erasing(op);
                 Err(nbError::WouldBlock)
