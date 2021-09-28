@@ -29,6 +29,7 @@ const APP: () = {
 
         //takes some time
         nb::block!(flash.erase(FlashErase::Sector4K(0))).unwrap();
+        nb::block!(flash.erase(FlashErase::Sector4K(4096))).unwrap();
 
         //read, should be all 0xFF
         let mut r = [0x0; 64];
@@ -50,6 +51,19 @@ const APP: () = {
 
         r[35] = 0x91;
         nb::block!(flash.program(0, &r)).unwrap();
+        flash.read(0, &mut r).unwrap();
+        assert_eq!(r[35], 0x91);
+
+        flash.read(4096, &mut r).unwrap();
+        assert_eq!(r[0], 0xFF);
+        r[0] = 0;
+        nb::block!(flash.program(4096, &r)).unwrap();
+        flash.read(4096, &mut r).unwrap();
+        assert_eq!(r[0], 0x00);
+
+        nb::block!(flash.erase(FlashErase::Sector4K(4096))).unwrap();
+        flash.read(4096, &mut r).unwrap();
+        assert_eq!(r[0], 0xFF);
         flash.read(0, &mut r).unwrap();
         assert_eq!(r[35], 0x91);
 
