@@ -4,12 +4,13 @@
 use log::info;
 
 use embedded_graphics::{
-    fonts::{Font6x8, Text},
+    mono_font::{ascii::FONT_5X8 as Font, MonoTextStyleBuilder},
     pixelcolor::BinaryColor,
     prelude::*,
-    primitives::Circle,
-    style::{PrimitiveStyle, TextStyle, TextStyleBuilder},
+    primitives::{Circle, PrimitiveStyle},
+    text::{Baseline, Text},
 };
+
 use libdaisy::{
     field::{Field, FieldKeyboard, FieldLeds, FieldSwitches, FIELD_DISPLAY_SIZE},
     gpio, logger,
@@ -135,20 +136,16 @@ const APP: () = {
 
         let mut disp = field.split_display();
 
-        let style: TextStyle<_, Font6x8> = TextStyleBuilder::new(Font6x8)
+        let style = MonoTextStyleBuilder::new()
+            .font(&Font)
             .text_color(BinaryColor::On)
             .background_color(BinaryColor::Off)
             .build();
 
-        let text = Text::new("Hello Daisy!", Point::new(0, 0)).into_styled(style);
+        let text = Text::with_baseline("Hello Daisy!", Point::new(0, 0), style, Baseline::Top);
         text.draw(&mut disp).unwrap();
 
-        let style: TextStyle<_, Font6x8> = TextStyleBuilder::new(Font6x8)
-            .text_color(BinaryColor::On)
-            .background_color(BinaryColor::Off)
-            .build();
-
-        let text = Text::new(" - Rust", Point::new(0, 10)).into_styled(style);
+        let text = Text::with_baseline(" - Rust", Point::new(0, 10), style, Baseline::Top);
         text.draw(&mut disp).unwrap();
 
         let w = 8;
