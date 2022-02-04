@@ -1,4 +1,6 @@
-# libdaisy-rust
+# [Documentation](https://docs.rs/libdaisy)
+
+# libdaisy
 Hardware Abstraction Layer implementation for Daisy boards.
 
 ## Requirements
@@ -13,28 +15,30 @@ $ cargo install cargo-binutils
 
 $ rustup component add llvm-tools-preview
 ```
-Some flashing utility such as
+# A Flashing Utility
 * [Electro-smith web programmer](https://electro-smith.github.io/Programmer/)
 
 OR
 
 * [dfu-util](http://dfu-util.sourceforge.net/)
 
-## Optional
-* Other flashing tools such as [Probe.rs](https://probe.rs/)
+OR
+
+* [Probe.rs](https://probe.rs/)
+
+This requires a debug probe of some sort (e.g. ST link) and allows for fast debugging messages via RTT.
+
+cargo embed --features log-rtt --example passthru
 
 ## Build Examples
 cargo objcopy --example blinky --release -- -O binary blinky.bin
-
-cargo objcopy --example toggle --release -- -O binary toggle.bin
 
 cargo objcopy --example passthru --release -- -O binary passthru.bin
 
 [cargo-binutils-url]: https://github.com/rust-embedded/cargo-binutils
 
-## TODO
-* DMA - Get audio data via DMA instead of SAI FIFO. See [Issue 80](https://github.com/stm32-rs/stm32h7xx-hal/issues/80).
-* SDRAM - The SDRAM needs to be brought online using [stm32h7-fmc](https://crates.io/crates/stm32h7-fmc).
-* MPU - The memory protection unit needs to be configured.
-* dcache - Needs to be enabled.
-* QSPI - Configur QSPI flash memory.
+# Minimum supported Rust version
+The Minimum Supported Rust Version (MSRV) at the moment is 1.51.0.
+# Demos
+
+[Looper](https://github.com/mtthw-meyer/daisy-looper) - Basic one button looper.

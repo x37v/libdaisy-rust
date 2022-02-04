@@ -2,39 +2,46 @@
 #![allow(unused_imports)]
 #![no_main]
 #![no_std]
-use rtic::cyccnt::U32Ext;
-
-use log::info;
-
-use stm32h7xx_hal::adc;
-use stm32h7xx_hal::stm32;
-use stm32h7xx_hal::timer::Timer;
-
-use libdaisy_rust::audio;
-use libdaisy_rust::gpio::*;
-use libdaisy_rust::hid;
-use libdaisy_rust::logger;
-use libdaisy_rust::prelude::*;
-use libdaisy_rust::system;
-use libdaisy_rust::MILICYCLES;
 
 #[rtic::app(
     device = stm32h7xx_hal::stm32,
     peripherals = true,
-    monotonic = rtic::cyccnt::CYCCNT,
 )]
-const APP: () = {
-    struct Resources {
-        audio: audio::Audio,
-        adc1: adc::Adc<stm32::ADC1, adc::Enabled>,
+mod app {
+    //use rtic::cyccnt::U32Ext;
+
+    use log::info;
+
+    use stm32h7xx_hal::adc;
+    use stm32h7xx_hal::stm32;
+    use stm32h7xx_hal::timer::Timer;
+
+    use libdaisy::audio;
+    use libdaisy::gpio::*;
+    use libdaisy::hid;
+    use libdaisy::logger;
+    use libdaisy::prelude::*;
+    use libdaisy::system;
+    use libdaisy::MILICYCLES;
+
+    #[shared]
+    struct Shared {
         control1: hid::AnalogControl<Daisy15<Analog>>,
+    }
+
+    #[local]
+    struct Local {
+        audio: audio::Audio,
+        buffer: audio::AudioBuffer,
+        adc1: adc::Adc<stm32::ADC1, adc::Enabled>,
         timer2: Timer<stm32::TIM2>,
     }
 
     #[init]
-    fn init(ctx: init::Context) -> init::LateResources {
+    fn init(ctx: init::Context) -> (Shared, Local, init::Monotonics) {
         logger::init();
         let mut system = system::System::init(ctx.core, ctx.device);
+        let buffer = [(0.0, 0.0); audio::BLOCK_SIZE_MAX];
 
         info!("Enable adc1");
         let mut adc1 = system.adc1.enable();
@@ -52,12 +59,16 @@ const APP: () = {
         // Transform linear input into logarithmic
         control1.set_transform(|x| x * x);
 
-        init::LateResources {
-            audio: system.audio,
-            adc1,
-            control1,
-            timer2: system.timer2,
-        }
+        (
+            Shared { control1 },
+            Local {
+                audio: system.audio,
+                buffer,
+                adc1,
+                timer2: system.timer2,
+            },
+            init::Monotonics(),
+        )
     }
 
     // Non-default idle ensures chip doesn't go to sleep which causes issues for
@@ -69,37 +80,33 @@ const APP: () = {
         }
     }
 
-    // Interrupt handler for audio, should not generally need to be modified
-    #[task( binds = SAI1, resources = [audio, control1], priority = 8 )]
-    fn audio_handler(ctx: audio_handler::Context) {
-        let audio = ctx.resources.audio;
-        audio.read();
+    // Interrupt handler for audio
+    #[task(binds = DMA1_STR1, local = [audio, buffer], shared = [control1], priority = 8)]
+    fn audio_handler(mut ctx: audio_handler::Context) {
+        let audio_handler::LocalResources { audio, buffer } = ctx.local;
 
-        if let Some(stereo_iter) = audio.input.get_stereo_iter() {
-            for (mut left, mut right) in stereo_iter {
-                // Highest priority task can access without locking
-                let volume = ctx.resources.control1.get_value();
-                left *= volume;
-                right *= volume;
-                audio.output.push((left, right)).unwrap();
+        if audio.get_stereo(buffer) {
+            for (left, right) in buffer {
+                ctx.shared.control1.lock(|c| {
+                    let volume = c.get_value();
+                    info!("{}", volume);
+                    *left *= volume;
+                    *right *= volume;
+                    audio.push_stereo((*left, *right)).unwrap();
+                });
             }
         }
-
-        audio.send();
     }
 
-    #[task( binds = TIM2, resources = [timer2, adc1, control1] )]
+    #[task(binds = TIM2, local = [timer2, adc1], shared = [control1])]
     fn interface_handler(mut ctx: interface_handler::Context) {
-        ctx.resources.timer2.clear_irq();
-        let adc1 = ctx.resources.adc1;
+        ctx.local.timer2.clear_irq();
+        let adc1 = ctx.local.adc1;
 
-        // Lower priority task(s) need to lock the resource.
-        let mut data = 0;
-        let mut val: f32 = 0.0;
-        ctx.resources.control1.lock(|control1| {
-            data = adc1.read(&mut control1.pin).unwrap();
-            control1.update(data);
-            val = control1.get_value();
+        ctx.shared.control1.lock(|control1| {
+            if let Ok(data) = adc1.read(control1.get_pin()) {
+                control1.update(data);
+            };
         });
     }
-};
+}
