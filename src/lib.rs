@@ -8,9 +8,6 @@ use cortex_m::asm::delay as delay_cycles;
 
 use stm32h7xx_hal::time::{Hertz, MegaHertz};
 
-///export hal
-pub use stm32h7xx_hal as hal;
-
 pub const MILLI: u32 = 1_000;
 pub const MICRO: u32 = 1_000_000;
 pub const NANO: u32 = 1_000_000_000;
@@ -26,6 +23,7 @@ pub const MICROCYCLES: u32 = CLOCK_RATE_HZ.0 / MICRO;
 
 pub type FrameTimer = stm32h7xx_hal::timer::Timer<stm32h7xx_hal::stm32::TIM2>;
 
+///export hal
 pub use stm32h7xx_hal as hal;
 
 pub mod audio;
